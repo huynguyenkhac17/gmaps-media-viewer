@@ -60,6 +60,7 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
 .del{position:absolute;right:6px;top:6px;z-index:2;width:24px;height:24px;padding:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:0;opacity:0;font-size:15px;line-height:1}
 .card:hover .del{opacity:1}
 .foot{display:flex;gap:6px;padding:6px;align-items:center}
+.date{padding:0 8px 6px;font-size:12px;color:var(--muted)}
 .foot .id{flex:1;min-width:0;font:11px ui-monospace,Consolas,monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foot button{padding:4px 8px;font-size:12px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#202124;color:#fff;padding:9px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50;max-width:90vw}
@@ -173,6 +174,26 @@ const photoUrl = p => HOST + p + '=s0';
 const videoUrl = p => HOST + p + '=dv';
 const thumbUrl = p => HOST + p + '=w300-h300-p-k-no';   // server-side crop: small & fast
 const urlOf = it => it.kind === 'video' ? videoUrl(it.p) : photoUrl(it.p);
+// Maps shows only month/year ("Tháng 5 2024", "May 2024") or relative time ("3 tuần trước").
+// Day is fixed to 15 (agreed): -> "15/05/2024". Relative times are counted back from `now`.
+const MON = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function toDate15(raw, now = new Date()) {
+  const s = String(raw || '').toLowerCase().normalize('NFC');
+  let m, y, d;
+  if ((d = s.match(/(?:tháng|thg)\s*(\d{1,2})(?:,|\s)+(?:năm\s*)?(\d{4})/))) { m = +d[1]; y = +d[2]; }
+  else if ((d = s.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+(\d{4})/))) { m = MON.indexOf(d[1]) + 1; y = +d[2]; }
+  else if ((d = s.match(/(\d+|một|an?)\s*(ngày|tuần|tháng|năm|day|week|month|year)s?\s*(?:trước|ago)/)) || /hôm qua|yesterday/.test(s)) {
+    const n = !d ? 1 : /\d/.test(d[1]) ? +d[1] : 1, u = d ? d[2] : 'ngày', t = new Date(now);
+    t.setDate(15);   // avoid month overflow (31 Mar - 1 month)
+    if (/ngày|day/.test(u)) t.setTime(new Date(now).getTime() - n * 864e5);
+    else if (/tuần|week/.test(u)) t.setTime(new Date(now).getTime() - n * 7 * 864e5);
+    else if (/tháng|month/.test(u)) t.setMonth(t.getMonth() - n);
+    else t.setFullYear(t.getFullYear() - n);
+    m = t.getMonth() + 1; y = t.getFullYear();
+  }
+  if (!m || m > 12 || !y) return '';
+  return '15/' + String(m).padStart(2, '0') + '/' + y;
+}
 /* ==== END CORE ==== */
 
 const $ = s => document.querySelector(s);
@@ -200,10 +221,10 @@ async function copyText(s, label) {
   toast(label || 'Đã copy');
 }
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind }) => [p, kind]))); } catch {}
+  try { localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw }) => [p, kind, date || '', dateRaw || '']))); } catch {}
 }
 function load() {
-  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind]) => items.set(p, { p, kind: kind === 'pending' ? 'pending' : kind, sel: false })); } catch {}
+  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw]) => items.set(p, { p, kind, date, dateRaw, sel: false })); } catch {}
 }
 const shortId = p => p.slice(-14);
 const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
@@ -241,7 +262,8 @@ function cardHTML(it) {
     <div class="thumb"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="">
       <div class="play" hidden><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div>
       <span class="badge" hidden></span></div>
-    <div class="foot"><span class="id"></span><button class="cp">Copy URL</button></div>`;
+    <div class="foot"><span class="id"></span><button class="cp">Copy URL</button></div>
+    <div class="date" hidden></div>`;
 }
 function updateCard(it) {
   const c = it.el; if (!c) return;
@@ -253,6 +275,10 @@ function updateCard(it) {
   b.textContent = it.kind === 'pending' ? 'đang kiểm tra…' : 'MP4';
   c.querySelector('.id').textContent = '…' + shortId(it.p);
   c.querySelector('.id').title = urlOf(it);
+  const dt = c.querySelector('.date');
+  dt.hidden = it.kind !== 'video';
+  dt.textContent = 'Ngày đăng: ' + (it.date || '—');
+  dt.title = it.dateRaw ? 'Maps ghi: ' + it.dateRaw : 'Không có ngày (chỉ có khi lấy bằng bookmark)';
 }
 function makeCard(it) {
   const c = document.createElement('div'); c.className = 'card'; c.innerHTML = cardHTML(it);
@@ -315,7 +341,7 @@ function openLB(it) {
   const body = $('#lbbody');
   body.querySelectorAll('img,video,.lbmsg').forEach(n => n.remove());
   const url = urlOf(it), list = listOf(kindOf(it)), i = list.indexOf(it);
-  $('#lbt').textContent = `${it.kind === 'video' ? 'Video' : 'Ảnh'} ${i + 1}/${list.length} — ${url}`;
+  $('#lbt').textContent = `${it.kind === 'video' ? 'Video' : 'Ảnh'} ${i + 1}/${list.length}${it.date ? ' · ' + it.date : ''} — ${url}`;
   $('#lbopen').href = url;
   const msg = Object.assign(document.createElement('div'), { className: 'lbmsg', textContent: 'Đang tải bản gốc…' });
   body.appendChild(msg);
@@ -436,6 +462,47 @@ function grab(APP) {
       if (!sc.isConnected) sc = scroller();
     }
   }
+  /* Upload date: Maps only shows it for the OPEN item, so click each video tile and take the
+     date-like text that appears/changes (diff against before the click). */
+  const DRE = /(?:tháng|thg)\s*\d{1,2}(?:,|\s)+(?:năm\s*)?\d{4}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}|(?:\d+|một|an?)\s*(?:ngày|tuần|tháng|năm|days?|weeks?|months?|years?)\s*(?:trước|ago)|hôm qua|yesterday/i;
+  const dates = () => {
+    const r = [];
+    for (const e of document.querySelectorAll('body *')) {
+      if (e.childElementCount || box.contains(e)) continue;
+      const t = (e.textContent || '').trim();
+      if (!t || t.length > 80) continue;
+      const m = t.match(DRE);
+      if (m && !r.includes(m[0]) && vis(e)) r.push(m[0]);
+    }
+    return r;
+  };
+  const DATES = {};
+  async function readDates() {
+    const idOf = t => { const s = new Set(); scan(t, s); return [...s][0]; };
+    const done = new Set(), sc = scroller();
+    let last = '', guard = 0;
+    if (sc) { sc.scrollTop = 0; await sleep(500); }
+    while (!stop && done.size < VID.size && guard++ < VID.size * 4 + 10) {
+      const t = [...tiles()].find(x => { const id = idOf(x); return id && VID.has(id) && !done.has(id); });
+      if (!t) {
+        if (!sc) break;
+        const before = sc.scrollTop; sc.scrollBy(0, sc.clientHeight * 0.85); await sleep(500);
+        if (sc.scrollTop === before) break; continue;
+      }
+      const id = idOf(t); done.add(id);
+      msg.textContent = `📍 Đọc ngày đăng video ${done.size}/${VID.size}…`;
+      t.scrollIntoView({ block: 'center' });
+      const prev = dates();
+      (t.matches('a,button,[jsaction]') ? t : t.querySelector('a,button,[jsaction]') || t).click();
+      let pick = '';
+      for (const end = Date.now() + 2500; Date.now() < end && !pick;) {
+        await sleep(200);
+        pick = dates().find(x => !prev.includes(x)) || '';
+      }
+      if (!pick) { const cur = dates(); pick = cur.includes(last) ? last : (cur.length === 1 ? cur[0] : ''); }
+      if (pick) DATES[id] = last = pick;
+    }
+  }
   (async () => {
     await openGallery();
     if (abort) return;
@@ -451,6 +518,7 @@ function grab(APP) {
       await sleep(800);
       await scrollAll(VID);
       vt = stop ? 0 : 1;
+      if (VID.size) await readDates();
     }
     if (abort) return;
     if (!ALL.size && !VID.size) scan(main(), ALL);
@@ -458,7 +526,7 @@ function grab(APP) {
     const photos = [...ALL].filter(p => !VID.has(p));
     if (!photos.length && !VID.size) { msg.textContent = 'Không thấy ảnh/video nào. Hãy mở một địa điểm trên Google Maps.'; go.remove(); no.textContent = 'Đóng'; return; }
     const h1 = document.querySelector('[role="main"] h1, h1');
-    const q = new URLSearchParams({ new: '1', vt: String(vt), n: h1 ? h1.textContent.trim() : '', p: photos.join(','), v: [...VID].join(',') });
+    const q = new URLSearchParams({ new: '1', vt: String(vt), n: h1 ? h1.textContent.trim() : '', p: photos.join(','), v: [...VID].join(','), vd: JSON.stringify(DATES) });
     const url = APP + '#' + q;
     window.__gmvRun = 0;
     const w = window.open(url, 'gmv-viewer');
@@ -483,7 +551,8 @@ function ingest(hash) {
   if (!q.has('p') && !q.has('v')) return false;
   if (q.get('new') === '1') { items.clear(); setPlace(q.get('n') || ''); }
   const known = q.get('vt') === '1';
-  for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', sel: false });
+  let raw = {}; try { raw = JSON.parse(q.get('vd') || '{}'); } catch {}
+  for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', sel: false, dateRaw: raw[p] || '', date: toDate15(raw[p]) });
   for (const p of extractPaths(q.get('p') || '')) if (!items.has(p)) {
     const it = { p, kind: known ? 'photo' : 'pending', sel: false }; items.set(p, it);
     if (!known) classify(it);

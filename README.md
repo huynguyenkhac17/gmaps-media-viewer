@@ -30,6 +30,13 @@ Bookmark quét riêng tab **Video** của thư viện ảnh, nên biết ngay id
 Với link dán tay (hoặc khi bấm *Gửi ngay* trước khi quét tab Video), trang gọi `<id>=dv` với
 `redirect: 'manual'`: video trả 302 sang mp4 gốc (`opaqueredirect`), ảnh trả lỗi → cột ảnh.
 
+## Ngày đăng video
+
+Maps chỉ hiện ngày đăng khi một video đang được mở, và chỉ ở dạng tháng/năm (`Tháng 5 2024`, `May 2024`)
+hoặc tương đối (`3 tuần trước`). Bookmark lần lượt mở từng video trong tab Video, đọc dòng ngày vừa xuất hiện,
+rồi trang xem quy đổi thành **`15/mm/yyyy`** (ngày cố định là 15; thời gian tương đối tính lùi từ lúc quét).
+Rê chuột lên dòng ngày để xem chữ gốc Maps ghi. Video dán tay thì không có ngày.
+
 ## Chỉ quét ô của thư viện ảnh
 
 Google Maps là SPA: chuyển địa điểm không tải lại trang, nên DOM và `performance` vẫn giữ ảnh của các
