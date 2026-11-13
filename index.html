@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>GMaps Media Viewer</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--line:#e3e6eb;--text:#1b1f24;--muted:#667085;
+  --accent:#1a73e8;--accent-ink:#fff;--ok:#188038;--warn:#b06000;--chip:#eef2f7;
+  --radius:10px;--shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1115;--panel:#171a21;--line:#2a2f3a;--text:#e6e8ec;--muted:#98a2b3;
+    --accent:#8ab4f8;--accent-ink:#0b1220;--ok:#81c995;--warn:#fdd663;--chip:#222734;
+    --shadow:none}
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:16px;margin:0;display:flex;align-items:center;gap:8px;white-space:nowrap}
+h1 svg{width:20px;height:20px;fill:#ea4335}
+.status{color:var(--muted);font-size:13px;margin-left:auto}
+main{padding:16px;max-width:1800px;margin:0 auto}
+.input{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:12px}
+textarea{width:100%;min-height:64px;max-height:220px;resize:vertical;font:13px/1.4 ui-monospace,Consolas,monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
+textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.actions{display:flex;flex-direction:column;gap:8px;min-width:150px}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:8px;padding:6px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+.help{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.bm{background:#ea4335;color:#fff;border-color:#ea4335;font-weight:600;cursor:grab}
+details{grid-column:1/-1;color:var(--muted);font-size:13px}
+details ol{margin:6px 0 0;padding-left:20px}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
+@media (max-width:900px){.cols{grid-template-columns:1fr}.input{grid-template-columns:1fr}.actions{flex-direction:row;flex-wrap:wrap}}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);min-height:200px}
+.colhead{position:sticky;top:53px;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.colhead h2{font-size:15px;margin:0}
+.count{background:var(--chip);border-radius:999px;padding:1px 8px;font-size:12px;color:var(--muted)}
+.colhead .sp{flex:1}
+label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer;user-select:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:12px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.card{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+.card.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.thumb{position:relative;aspect-ratio:1;cursor:zoom-in;background:var(--chip);overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.thumb:hover img{transform:scale(1.04)}
+.play{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.play span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center}
+.play svg{width:20px;height:20px;fill:#fff;margin-left:3px}
+.badge{position:absolute;right:6px;bottom:6px;font-size:11px;background:rgba(0,0,0,.6);color:#fff;border-radius:4px;padding:1px 6px}
+.ck{position:absolute;left:6px;top:6px;z-index:2;width:22px;height:22px;accent-color:var(--accent);cursor:pointer}
+.del{position:absolute;right:6px;top:6px;z-index:2;width:24px;height:24px;padding:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:0;opacity:0;font-size:15px;line-height:1}
+.card:hover .del{opacity:1}
+.foot{display:flex;gap:6px;padding:6px;align-items:center}
+.foot .id{flex:1;min-width:0;font:11px ui-monospace,Consolas,monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot button{padding:4px 8px;font-size:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#202124;color:#fff;padding:9px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50;max-width:90vw}
+.toast.on{opacity:1;transform:translateX(-50%)}
+/* lightbox */
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:40;display:none;flex-direction:column}
+.lb.on{display:flex}
+.lbbar{display:flex;gap:8px;align-items:center;padding:10px 14px;color:#ddd}
+.lbbar .t{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbbar button,.lbbar a{background:#2b2f36;color:#eee;border-color:#3a3f48}
+.lbbody{flex:1;min-height:0;display:grid;place-items:center;position:relative;padding:0 56px 16px}
+.lbbody img,.lbbody video{max-width:100%;max-height:100%;object-fit:contain}
+.lbmsg{color:#ccc;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;font-size:28px;background:rgba(255,255,255,.08);color:#fff;border:0}
+.nav.p{left:6px}.nav.n{right:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.2 11.4 7 12.2a.7.7 0 0 0 1 0c.8-.8 7-6.8 7-12.2A7.5 7.5 0 0 0 12 2Zm0 10.3a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>GMaps Media Viewer</h1>
+  <span class="status" id="status"></span>
+</header>
+
+<main>
+  <section class="input">
+    <textarea id="src" placeholder="Dán link Google Maps (địa điểm / ảnh / video), link lh3, hoặc cả danh sách URL rồi nhấn Thêm (Ctrl+Enter)…"></textarea>
+    <div class="actions">
+      <button class="primary" id="add">Thêm</button>
+      <button id="clear">Xoá hết</button>
+    </div>
+    <div class="help">
+      <span>Lấy <b>toàn bộ</b> ảnh &amp; video của địa điểm: kéo nút này lên thanh dấu trang →</span>
+      <a class="btn bm" id="bm" href="#" title="Kéo lên thanh dấu trang (Ctrl+Shift+B để hiện thanh)">📍 Lấy ảnh Maps</a>
+      <button id="bmcopy" title="Nếu không kéo được: tạo bookmark mới và dán đoạn này vào ô URL">Copy code bookmark</button>
+    </div>
+    <details>
+      <summary>Hướng dẫn</summary>
+      <ol>
+        <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
+        <li>Mở địa điểm trên Google Maps → bấm vào ảnh để mở mục <b>Ảnh/Video</b> → cuộn hết danh sách để Maps nạp đủ.</li>
+        <li>Bấm bookmark <b>📍 Lấy ảnh Maps</b>: trang này mở ra với toàn bộ ảnh (bên trái) và video (bên phải).</li>
+        <li>Chỉ dán link địa điểm thì chỉ lấy được ảnh có sẵn trong link (thường là ảnh bìa), vì Google không cho trang web khác đọc danh sách ảnh.</li>
+        <li>Ảnh copy ra dạng <code>=s0</code> (gốc), video dạng <code>=dv</code> (mp4 gốc). Tick nhiều ô rồi <b>Copy đã chọn</b> → các link cách nhau dấu phẩy.</li>
+      </ol>
+    </details>
+  </section>
+
+  <div class="cols">
+    <section class="col" data-kind="photo">
+      <div class="colhead">
+        <h2>Ảnh</h2><span class="count" data-count>0</span>
+        <span class="sp"></span>
+        <label class="all"><input type="checkbox" data-all> Chọn tất cả</label>
+        <button data-copysel disabled>Copy đã chọn</button>
+      </div>
+      <div class="grid" data-grid></div>
+      <div class="empty" data-empty>Chưa có ảnh.</div>
+    </section>
+    <section class="col" data-kind="video">
+      <div class="colhead">
+        <h2>Video</h2><span class="count" data-count>0</span>
+        <span class="sp"></span>
+        <label class="all"><input type="checkbox" data-all> Chọn tất cả</label>
+        <button data-copysel disabled>Copy đã chọn</button>
+      </div>
+      <div class="grid" data-grid></div>
+      <div class="empty" data-empty>Chưa có video.</div>
+    </section>
+  </div>
+</main>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true">
+  <div class="lbbar">
+    <span class="t" id="lbt"></span>
+    <button id="lbcopy">Copy URL</button>
+    <a class="btn" id="lbopen" target="_blank" rel="noreferrer">Mở tab mới</a>
+    <button id="lbclose">✕ Đóng</button>
+  </div>
+  <div class="lbbody" id="lbbody">
+    <button class="nav p" id="lbprev" aria-label="Trước">‹</button>
+    <button class="nav n" id="lbnext" aria-label="Sau">›</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ==== CORE (pure, tested by test.mjs) ==== */
+const HOST = 'https://lh3.googleusercontent.com/';
+// Paths that are UI/avatars, not place media.
+const SKIP = /^(a|a-|ogw)\//;
+
+// Pull every lh3 media id out of arbitrary text: Maps links (URL-encoded inside !6s…),
+// raw lh3 links, CSS background-image, JSON-escaped strings, or bare paths from the bookmarklet.
+function extractPaths(text) {
+  const t = String(text || '')
+    .replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\\//g, '/')
+    .replace(/%25/g, '%').replace(/%2F/gi, '/').replace(/%3D/gi, '=').replace(/%3A/gi, ':');
+  const out = [], seen = new Set();
+  const push = p => {
+    p = p.split('=')[0].replace(/\/+$/, '');
+    if (p.length < 20 || SKIP.test(p) || seen.has(p)) return;
+    seen.add(p); out.push(p);
+  };
+  for (const m of t.matchAll(/(?:https?:)?\/\/lh[3-6]\.(?:googleusercontent|ggpht)\.com\/([^\s"'<>()\\,!?#&;]+)/gi)) push(m[1]);
+  // Bare paths (bookmarklet payload): "gps-cs-s/AB…", "p/AF1Q…", "grass-cs/…"
+  if (!out.length) for (const m of t.matchAll(/(?:^|[\s,])((?:[a-z0-9-]+\/)?[A-Za-z0-9_-]{30,})(?==|$|[\s,])/gm)) push(m[1]);
+  return out;
+}
+const photoUrl = p => HOST + p + '=s0';
+const videoUrl = p => HOST + p + '=dv';
+const thumbUrl = p => HOST + p + '=w400-h400-k-no';
+const urlOf = it => it.kind === 'video' ? videoUrl(it.p) : photoUrl(it.p);
+/* ==== END CORE ==== */
+
+const $ = s => document.querySelector(s);
+const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', sel:false}
+const STORE = 'gmv.items.v1';
+const cols = {};
+document.querySelectorAll('.col').forEach(c => cols[c.dataset.kind] = {
+  el: c, grid: c.querySelector('[data-grid]'), empty: c.querySelector('[data-empty]'),
+  count: c.querySelector('[data-count]'), all: c.querySelector('[data-all]'), copy: c.querySelector('[data-copysel]'),
+});
+
+/* ---------- utils ---------- */
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 1800);
+}
+async function copyText(s, label) {
+  try { await navigator.clipboard.writeText(s); }
+  catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: s });
+    ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  toast(label || 'Đã copy');
+}
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind }) => [p, kind]))); } catch {}
+}
+function load() {
+  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind]) => items.set(p, { p, kind: kind === 'pending' ? 'pending' : kind, sel: false })); } catch {}
+}
+const shortId = p => p.slice(-14);
+const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
+
+/* ---------- classify: photo vs video ----------
+   lh3 id + "=dv" -> 302 to the original mp4 for videos; photos return 500 (no CORS -> fetch throws).
+   With redirect:'manual' a redirect shows up as an opaqueredirect response. */
+const queue = []; let running = 0; const LIMIT = 6;
+function classify(it) { queue.push(it); pump(); }
+function pump() {
+  while (running < LIMIT && queue.length) {
+    const it = queue.shift(); running++;
+    fetch(videoUrl(it.p), { redirect: 'manual', referrerPolicy: 'no-referrer', cache: 'force-cache' })
+      .then(r => r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400) ? 'video' : 'photo', () => 'photo')
+      .then(kind => {
+        if (!items.has(it.p)) return;
+        const moved = kind !== kindOf(it);
+        it.kind = kind;
+        moved ? render() : updateCard(it);
+        save();
+      })
+      .finally(() => { running--; status(); pump(); });
+  }
+  status();
+}
+function status() {
+  const pending = [...items.values()].filter(i => i.kind === 'pending').length;
+  $('#status').textContent = pending ? `Đang phân loại ảnh/video… còn ${pending}` : items.size ? `${items.size} mục` : '';
+}
+
+/* ---------- render ---------- */
+function cardHTML(it) {
+  return `<input type="checkbox" class="ck" aria-label="Chọn">
+    <button class="del" title="Xoá">×</button>
+    <div class="thumb"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="">
+      <div class="play" hidden><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div>
+      <span class="badge" hidden></span></div>
+    <div class="foot"><span class="id"></span><button class="cp">Copy URL</button></div>`;
+}
+function updateCard(it) {
+  const c = it.el; if (!c) return;
+  c.classList.toggle('sel', it.sel);
+  c.querySelector('.ck').checked = it.sel;
+  c.querySelector('.play').hidden = it.kind !== 'video';
+  const b = c.querySelector('.badge');
+  b.hidden = it.kind === 'photo';
+  b.textContent = it.kind === 'pending' ? 'đang kiểm tra…' : 'MP4';
+  c.querySelector('.id').textContent = '…' + shortId(it.p);
+  c.querySelector('.id').title = urlOf(it);
+}
+function makeCard(it) {
+  const c = document.createElement('div'); c.className = 'card'; c.innerHTML = cardHTML(it);
+  const img = c.querySelector('img'); img.src = thumbUrl(it.p);
+  img.onerror = () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'lbmsg', textContent: 'Không tải được', style: 'color:var(--muted);font-size:12px' })); };
+  c.querySelector('.ck').onchange = e => { it.sel = e.target.checked; updateCard(it); syncHead(); };
+  c.querySelector('.cp').onclick = () => copyText(urlOf(it), 'Đã copy URL ' + (it.kind === 'video' ? 'video' : 'ảnh'));
+  c.querySelector('.del').onclick = () => { items.delete(it.p); save(); render(); };
+  c.querySelector('.thumb').onclick = () => openLB(it);
+  it.el = c; updateCard(it); return c;
+}
+function listOf(kind) { return [...items.values()].filter(i => kindOf(i) === kind); }
+function render() {
+  for (const kind of ['photo', 'video']) {
+    const col = cols[kind], list = listOf(kind), frag = document.createDocumentFragment();
+    for (const it of list) { frag.appendChild(it.el || makeCard(it)); updateCard(it); }
+    col.grid.replaceChildren(frag);
+    col.empty.hidden = list.length > 0;
+    col.count.textContent = list.length;
+  }
+  syncHead(); status();
+}
+function syncHead() {
+  for (const kind of ['photo', 'video']) {
+    const col = cols[kind], list = listOf(kind), n = list.filter(i => i.sel).length;
+    col.all.checked = list.length > 0 && n === list.length;
+    col.all.indeterminate = n > 0 && n < list.length;
+    col.copy.disabled = !n;
+    col.copy.textContent = n ? `Copy đã chọn (${n})` : 'Copy đã chọn';
+  }
+}
+for (const kind of ['photo', 'video']) {
+  const col = cols[kind];
+  col.all.onchange = () => { listOf(kind).forEach(i => { i.sel = col.all.checked; updateCard(i); }); syncHead(); };
+  col.copy.onclick = () => {
+    const sel = listOf(kind).filter(i => i.sel);
+    copyText(sel.map(urlOf).join(','), `Đã copy ${sel.length} link ${kind === 'video' ? 'video' : 'ảnh'}`);
+  };
+}
+
+/* ---------- input ---------- */
+function addFrom(text) {
+  const paths = extractPaths(text);
+  let added = 0;
+  for (const p of paths) if (!items.has(p)) { const it = { p, kind: 'pending', sel: false }; items.set(p, it); classify(it); added++; }
+  render(); save();
+  if (!paths.length) toast('Không thấy link ảnh/video nào. Link địa điểm thường không chứa danh sách ảnh — dùng bookmark 📍.');
+  else toast(`Thêm ${added} mục` + (paths.length - added ? `, bỏ ${paths.length - added} trùng` : ''));
+  return added;
+}
+$('#add').onclick = () => { if (addFrom($('#src').value)) $('#src').value = ''; };
+$('#src').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#add').click(); });
+$('#src').addEventListener('paste', () => setTimeout(() => { if (extractPaths($('#src').value).length) $('#add').click(); }, 0));
+$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); save(); render(); } };
+
+/* ---------- lightbox ---------- */
+let cur = null;
+function openLB(it) {
+  cur = it;
+  const body = $('#lbbody');
+  body.querySelectorAll('img,video,.lbmsg').forEach(n => n.remove());
+  const url = urlOf(it), list = listOf(kindOf(it)), i = list.indexOf(it);
+  $('#lbt').textContent = `${it.kind === 'video' ? 'Video' : 'Ảnh'} ${i + 1}/${list.length} — ${url}`;
+  $('#lbopen').href = url;
+  const msg = Object.assign(document.createElement('div'), { className: 'lbmsg', textContent: 'Đang tải bản gốc…' });
+  body.appendChild(msg);
+  let m;
+  if (it.kind === 'video') {
+    m = Object.assign(document.createElement('video'), { controls: true, autoplay: true, playsInline: true, poster: HOST + it.p + '=w1280-k-no' });
+    m.onloadeddata = () => msg.remove();
+    m.onerror = () => { msg.textContent = 'Trình duyệt không phát được video này — bấm "Mở tab mới" để tải mp4 gốc.'; };
+    m.src = url;
+  } else {
+    m = Object.assign(document.createElement('img'), { referrerPolicy: 'no-referrer', alt: '' });
+    m.onload = () => msg.remove();
+    m.onerror = () => { msg.textContent = 'Không tải được ảnh gốc.'; };
+    m.src = url;
+  }
+  body.appendChild(m);
+  $('#lb').classList.add('on');
+}
+function closeLB() { $('#lb').classList.remove('on'); $('#lbbody').querySelectorAll('img,video').forEach(n => { n.src = ''; n.remove(); }); cur = null; }
+function stepLB(d) {
+  if (!cur) return;
+  const list = listOf(kindOf(cur)), i = list.indexOf(cur);
+  if (list.length) openLB(list[(i + d + list.length) % list.length]);
+}
+$('#lbclose').onclick = closeLB;
+$('#lbprev').onclick = () => stepLB(-1);
+$('#lbnext').onclick = () => stepLB(1);
+$('#lbcopy').onclick = () => cur && copyText(urlOf(cur), 'Đã copy URL');
+$('#lb').addEventListener('click', e => { if (e.target.id === 'lbbody') closeLB(); });
+document.addEventListener('keydown', e => {
+  if (!cur) return;
+  if (e.key === 'Escape') closeLB(); else if (e.key === 'ArrowLeft') stepLB(-1); else if (e.key === 'ArrowRight') stepLB(1);
+});
+
+/* ---------- bookmarklet ----------
+   Runs on the user's own Maps tab (their IP + session, so Google doesn't block it): scans the DOM
+   (attributes incl. inline background-image, shadow roots) and loaded resources for lh3 ids,
+   then opens this page with the ids in the URL hash. */
+const APP = location.origin + location.pathname;
+const BM_SRC = `(()=>{const S=new Set,R=/lh[3-6]\\.(?:googleusercontent|ggpht)\\.com(?:\\/|%2F)([^\\s"'<>()\\\\,!?#&;]+)/gi,
+g=s=>{if(s&&s.indexOf('lh')>-1)for(const m of s.replace(/%2F/gi,'/').matchAll(R)){const p=m[1].split('=')[0].replace(/%3D.*/i,'');if(p.length>19&&!/^(a|a-|ogw)\\//.test(p))S.add(p)}},
+w=r=>{const t=document.createTreeWalker(r,1);for(let e=t.currentNode;e;e=t.nextNode()){if(e.nodeType!==1)continue;for(const a of e.attributes)g(a.value);if(e.shadowRoot)w(e.shadowRoot)}};
+w(document);performance.getEntriesByType('resource').forEach(e=>g(e.name));g(location.href);
+if(!S.size){alert('Không thấy ảnh/video nào. Hãy mở mục Ảnh của địa điểm trên Google Maps và cuộn xuống trước.');return}
+window.open('${APP}#p='+encodeURIComponent([...S].join(',')),'_blank')})()`.replace(/\n/g, '');
+$('#bm').href = 'javascript:' + encodeURIComponent(BM_SRC);
+$('#bm').onclick = e => { e.preventDefault(); toast('Kéo nút này lên thanh dấu trang, rồi bấm nó khi đang mở Google Maps'); };
+$('#bmcopy').onclick = () => copyText('javascript:' + encodeURIComponent(BM_SRC), 'Đã copy code — tạo bookmark mới và dán vào ô URL');
+
+/* ---------- boot ---------- */
+load();
+for (const it of items.values()) if (it.kind === 'pending') classify(it);
+const h = new URLSearchParams(location.hash.slice(1)).get('p');
+if (h) { addFrom(h); history.replaceState(null, '', location.pathname); }
+render();
+</script>
+</body>
+</html>
