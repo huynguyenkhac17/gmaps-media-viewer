@@ -79,7 +79,7 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
 </head>
 <body>
 <header>
-  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.2 11.4 7 12.2a.7.7 0 0 0 1 0c.8-.8 7-6.8 7-12.2A7.5 7.5 0 0 0 12 2Zm0 10.3a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>GMaps Media Viewer</h1>
+  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.2 11.4 7 12.2a.7.7 0 0 0 1 0c.8-.8 7-6.8 7-12.2A7.5 7.5 0 0 0 12 2Zm0 10.3a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>GMaps Media Viewer <span id="place" style="font-weight:400;color:var(--muted)"></span></h1>
   <span class="status" id="status"></span>
 </header>
 
@@ -99,8 +99,8 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       <summary>Hướng dẫn</summary>
       <ol>
         <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
-        <li>Mở địa điểm trên Google Maps → bấm vào ảnh để mở mục <b>Ảnh/Video</b> → cuộn hết danh sách để Maps nạp đủ.</li>
-        <li>Bấm bookmark <b>📍 Lấy ảnh Maps</b>: trang này mở ra với toàn bộ ảnh (bên trái) và video (bên phải).</li>
+        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự mở mục ảnh, tự cuộn đến cuối, quét tab Video, rồi mở trang này với ảnh (trái) và video (phải). Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
+        <li>Đã cập nhật bookmark? Xoá bookmark cũ và kéo lại nút mới.</li>
         <li>Chỉ dán link địa điểm thì chỉ lấy được ảnh có sẵn trong link (thường là ảnh bìa), vì Google không cho trang web khác đọc danh sách ảnh.</li>
         <li>Ảnh copy ra dạng <code>=s0</code> (gốc), video dạng <code>=dv</code> (mp4 gốc). Tick nhiều ô rồi <b>Copy đã chọn</b> → các link cách nhau dấu phẩy.</li>
       </ol>
@@ -171,7 +171,7 @@ function extractPaths(text) {
 }
 const photoUrl = p => HOST + p + '=s0';
 const videoUrl = p => HOST + p + '=dv';
-const thumbUrl = p => HOST + p + '=w400-h400-k-no';
+const thumbUrl = p => HOST + p + '=w300-h300-p-k-no';   // server-side crop: small & fast
 const urlOf = it => it.kind === 'video' ? videoUrl(it.p) : photoUrl(it.p);
 /* ==== END CORE ==== */
 
@@ -211,7 +211,7 @@ const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
 /* ---------- classify: photo vs video ----------
    lh3 id + "=dv" -> 302 to the original mp4 for videos; photos return 500 (no CORS -> fetch throws).
    With redirect:'manual' a redirect shows up as an opaqueredirect response. */
-const queue = []; let running = 0; const LIMIT = 6;
+const queue = []; let running = 0; const LIMIT = 10;
 function classify(it) { queue.push(it); pump(); }
 function pump() {
   while (running < LIMIT && queue.length) {
@@ -306,7 +306,7 @@ function addFrom(text) {
 $('#add').onclick = () => { if (addFrom($('#src').value)) $('#src').value = ''; };
 $('#src').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#add').click(); });
 $('#src').addEventListener('paste', () => setTimeout(() => { if (extractPaths($('#src').value).length) $('#add').click(); }, 0));
-$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); save(); render(); } };
+$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); setPlace(''); save(); render(); } };
 
 /* ---------- lightbox ---------- */
 let cur = null;
@@ -351,26 +351,157 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- bookmarklet ----------
-   Runs on the user's own Maps tab (their IP + session, so Google doesn't block it): scans the DOM
-   (attributes incl. inline background-image, shadow roots) and loaded resources for lh3 ids,
-   then opens this page with the ids in the URL hash. */
+   grab() runs on the user's own Google Maps tab (their IP + session, so Google doesn't block it).
+   It opens the photo gallery, scrolls it to the end, scans the "Video" tab so the viewer knows which
+   ids are videos without probing, then hands everything to this page via the URL hash.
+   Each run REPLACES the viewer's list (new=1).
+   Rules: no innerHTML/eval (Maps enforces Trusted Types), only block comments (code is serialized). */
+function grab(APP) {
+  if (window.__gmvRun) return; window.__gmvRun = 1;
+  const RE = /lh[3-6]\.(?:googleusercontent|ggpht)\.com(?:\/|%2F)([^\s"'<>()\\,!?#&;]+)/gi;
+  const ALL = new Set(), VID = new Set();
+  let stop = 0, abort = 0;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const add = (s, set) => {
+    if (!s || s.indexOf('lh') < 0) return;
+    for (const m of s.replace(/%2F/gi, '/').matchAll(RE)) {
+      const p = m[1].split('=')[0].replace(/%3D.*/i, '');
+      if (p.length > 19 && !/^(a|a-|ogw)\//.test(p)) set.add(p);
+    }
+  };
+  const scan = (root, set) => {
+    const t = document.createTreeWalker(root, 1);
+    for (let e = t.currentNode; e; e = t.nextNode()) {
+      if (e.nodeType !== 1) continue;
+      for (const a of e.attributes) add(a.value, set);
+      if (e.shadowRoot) scan(e.shadowRoot, set);
+    }
+  };
+  /* --- overlay (createElement only: Trusted Types) --- */
+  const el = (tag, css, txt) => { const e = document.createElement(tag); e.style.cssText = css; if (txt) e.textContent = txt; return e; };
+  const box = el('div', 'position:fixed;top:12px;right:12px;z-index:2147483647;width:270px;background:#202124;color:#e8eaed;font:13px/1.45 system-ui,sans-serif;padding:12px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4)');
+  const msg = el('div', 'font-weight:600', '📍 Đang mở mục ảnh…');
+  const cnt = el('div', 'color:#9aa0a6;margin:4px 0 10px', '');
+  const row = el('div', 'display:flex;gap:6px');
+  const bcss = 'flex:1;border:0;border-radius:6px;padding:6px 8px;font:inherit;cursor:pointer;';
+  const go = el('button', bcss + 'background:#8ab4f8;color:#0b1220;font-weight:600', 'Gửi ngay');
+  const no = el('button', bcss + 'background:#3c4043;color:#e8eaed', 'Huỷ');
+  go.onclick = () => { stop = 1; };
+  no.onclick = () => { stop = abort = 1; box.remove(); window.__gmvRun = 0; };
+  row.append(go, no); box.append(msg, cnt, row); document.body.appendChild(box);
+  const show = () => { cnt.textContent = `Ảnh: ${[...ALL].filter(p => !VID.has(p)).length} · Video: ${VID.size}`; };
+  /* --- page helpers --- */
+  const main = () => document.querySelector('[role="main"]') || document.body;
+  const vis = e => e && e.getClientRects().length > 0;
+  const tiles = () => document.querySelectorAll('[data-photo-index]');
+  const seeds = () => { const t = [...tiles()]; return t.length ? t : [...main().querySelectorAll('[style*="googleusercontent"],img[src*="googleusercontent"]')]; };
+  const label = b => (b.getAttribute('aria-label') || b.textContent || '').trim();
+  const byText = re => [...document.querySelectorAll('button,[role="tab"],[role="button"]')].find(b => vis(b) && re.test(label(b)));
+  const waitFor = async (fn, ms) => { const end = Date.now() + ms; while (Date.now() < end && !abort) { const r = fn(); if (r) return r; await sleep(200); } return null; };
+  const scroller = () => {
+    for (const s of seeds().slice(0, 5))
+      for (let e = s.parentElement; e && e !== document.body; e = e.parentElement) {
+        const o = getComputedStyle(e).overflowY;
+        if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 20) return e;
+      }
+    return null;
+  };
+  async function openGallery() {
+    if (tiles().length) return;
+    const hero = document.querySelector('button[jsaction*="heroHeaderImage"]')
+      || byText(/^(ảnh|photos?|xem ảnh|see photos)(\s|$)/i)
+      || [...main().querySelectorAll('img[src*="googleusercontent"],[style*="googleusercontent"]')]
+           .map(e => e.closest('button,a,[jsaction]')).find(Boolean);
+    if (!hero) return;
+    hero.click();
+    await waitFor(() => tiles().length, 8000);
+    await sleep(600);
+  }
+  /* Scroll step by step (lazy tiles only get their image when on screen); stop when the end
+     stays the same for ~2.5s, so slow networks still get time to load the next batch. */
+  /* Only the open place's gallery tiles: Maps is an SPA, so the rest of the page (and the
+     performance entries) still hold photos of places visited earlier. */
+  const scanTiles = (set, sc) => { const t = tiles(); if (t.length) t.forEach(e => scan(e, set)); else scan(sc || main(), set); };
+  async function scrollAll(set) {
+    let sc = scroller(), idle = 0, lastH = -1, lastN = -1;
+    const t0 = Date.now();
+    while (!stop && Date.now() - t0 < 180000) {
+      scanTiles(set, sc); show();
+      if (!sc) break;
+      const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
+      if (end && sc.scrollHeight === lastH && set.size === lastN) { if (++idle >= 5) break; } else idle = 0;
+      lastH = sc.scrollHeight; lastN = set.size;
+      sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
+      await sleep(500);
+      if (!sc.isConnected) sc = scroller();
+    }
+  }
+  (async () => {
+    await openGallery();
+    if (abort) return;
+    msg.textContent = '📍 Đang cuộn mục ảnh…';
+    await scrollAll(ALL);
+    let vt = 0;
+    const vtab = !stop && byText(/^videos?$/i);
+    if (vtab) {
+      msg.textContent = '📍 Đang quét tab Video…';
+      const old = tiles()[0];
+      vtab.click();
+      await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 5000);
+      await sleep(800);
+      await scrollAll(VID);
+      vt = stop ? 0 : 1;
+    }
+    if (abort) return;
+    if (!ALL.size && !VID.size) scan(main(), ALL);
+    show();
+    const photos = [...ALL].filter(p => !VID.has(p));
+    if (!photos.length && !VID.size) { msg.textContent = 'Không thấy ảnh/video nào. Hãy mở một địa điểm trên Google Maps.'; go.remove(); no.textContent = 'Đóng'; return; }
+    const h1 = document.querySelector('[role="main"] h1, h1');
+    const q = new URLSearchParams({ new: '1', vt: String(vt), n: h1 ? h1.textContent.trim() : '', p: photos.join(','), v: [...VID].join(',') });
+    const url = APP + '#' + q;
+    window.__gmvRun = 0;
+    const w = window.open(url, 'gmv-viewer');
+    if (w) { msg.textContent = '✓ Đã gửi sang GMaps Media Viewer'; row.remove(); setTimeout(() => box.remove(), 2500); return; }
+    /* Popup blocked (the open happened long after the click): ask for one more click. */
+    msg.textContent = '✓ Xong! Bấm để mở kết quả';
+    go.textContent = 'Mở kết quả'; go.onclick = () => { window.open(url, 'gmv-viewer'); box.remove(); };
+    no.textContent = 'Đóng'; no.onclick = () => box.remove();
+  })();
+}
 const APP = location.origin + location.pathname;
-const BM_SRC = `(()=>{const S=new Set,R=/lh[3-6]\\.(?:googleusercontent|ggpht)\\.com(?:\\/|%2F)([^\\s"'<>()\\\\,!?#&;]+)/gi,
-g=s=>{if(s&&s.indexOf('lh')>-1)for(const m of s.replace(/%2F/gi,'/').matchAll(R)){const p=m[1].split('=')[0].replace(/%3D.*/i,'');if(p.length>19&&!/^(a|a-|ogw)\\//.test(p))S.add(p)}},
-w=r=>{const t=document.createTreeWalker(r,1);for(let e=t.currentNode;e;e=t.nextNode()){if(e.nodeType!==1)continue;for(const a of e.attributes)g(a.value);if(e.shadowRoot)w(e.shadowRoot)}};
-w(document);performance.getEntriesByType('resource').forEach(e=>g(e.name));g(location.href);
-if(!S.size){alert('Không thấy ảnh/video nào. Hãy mở mục Ảnh của địa điểm trên Google Maps và cuộn xuống trước.');return}
-window.open('${APP}#p='+encodeURIComponent([...S].join(',')),'_blank')})()`.replace(/\n/g, '');
+const BM_SRC = `(${grab})(${JSON.stringify(APP)})`;
 $('#bm').href = 'javascript:' + encodeURIComponent(BM_SRC);
-$('#bm').onclick = e => { e.preventDefault(); toast('Kéo nút này lên thanh dấu trang, rồi bấm nó khi đang mở Google Maps'); };
+$('#bm').onclick = e => { e.preventDefault(); toast('Kéo nút này lên thanh dấu trang, rồi bấm nó khi đang mở địa điểm trên Google Maps'); };
 $('#bmcopy').onclick = () => copyText('javascript:' + encodeURIComponent(BM_SRC), 'Đã copy code — tạo bookmark mới và dán vào ô URL');
 
 /* ---------- boot ---------- */
+// Data from the bookmarklet: replaces the current list (a new place), and when the Video tab was
+// scanned (vt=1) every kind is already known, so nothing needs probing.
+function ingest(hash) {
+  const q = new URLSearchParams(hash.replace(/^#/, ''));
+  if (!q.has('p') && !q.has('v')) return false;
+  if (q.get('new') === '1') { items.clear(); setPlace(q.get('n') || ''); }
+  const known = q.get('vt') === '1';
+  for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', sel: false });
+  for (const p of extractPaths(q.get('p') || '')) if (!items.has(p)) {
+    const it = { p, kind: known ? 'photo' : 'pending', sel: false }; items.set(p, it);
+    if (!known) classify(it);
+  }
+  history.replaceState(null, '', location.pathname);
+  render(); save();
+  toast(`Nhận ${items.size} mục từ Google Maps`);
+  return true;
+}
+function setPlace(n) {
+  $('#place').textContent = n ? '— ' + n : '';
+  try { localStorage.setItem('gmv.place', n); } catch {}
+}
+try { setPlace(localStorage.getItem('gmv.place') || ''); } catch {}
 load();
 for (const it of items.values()) if (it.kind === 'pending') classify(it);
-const h = new URLSearchParams(location.hash.slice(1)).get('p');
-if (h) { addFrom(h); history.replaceState(null, '', location.pathname); }
-render();
+if (!ingest(location.hash)) render();
+window.addEventListener('hashchange', () => ingest(location.hash));   // reused 'gmv-viewer' tab
 </script>
 </body>
 </html>

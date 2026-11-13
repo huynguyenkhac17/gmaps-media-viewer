@@ -9,8 +9,12 @@ Xem và copy link **ảnh gốc** (`=s0`) và **video gốc** (`=dv`, mp4) của
 
 1. Kéo nút **📍 Lấy ảnh Maps** trên trang lên thanh dấu trang (chỉ là bookmark, không cần cài extension).
    Không kéo được thì bấm **Copy code bookmark**, tạo bookmark mới và dán vào ô URL.
-2. Mở địa điểm trên Google Maps, mở mục **Ảnh/Video**, cuộn hết danh sách để Maps nạp đủ.
-3. Bấm bookmark: trang này mở ra với toàn bộ ảnh và video.
+2. Mở địa điểm trên Google Maps rồi bấm bookmark. Bookmark tự mở thư viện ảnh, tự cuộn đến cuối
+   (chờ ~2,5s ở cuối cho mạng chậm kịp nạp), quét tab **Video**, rồi mở trang này với ảnh (trái) và video (phải).
+   Khung nhỏ góc phải có **Gửi ngay** (không chờ cuộn hết) và **Huỷ**.
+3. Mỗi lần bấm bookmark **thay** danh sách cũ, nên các địa điểm không chồng lên nhau.
+
+Cập nhật bookmark: xoá bookmark cũ, kéo lại nút mới trên trang.
 
 Cũng có thể dán thẳng vào ô nhập: link Maps của ảnh/video, link lh3, CSS `background-image`, hoặc danh sách URL.
 
@@ -22,5 +26,11 @@ nên một link địa điểm chỉ cho được ảnh nằm sẵn trong link. 
 
 ## Phân biệt ảnh / video
 
-Ảnh và video Maps dùng chung kiểu id lh3. Trang gọi `<id>=dv` với `redirect: 'manual'`:
-video trả 302 sang mp4 gốc (`opaqueredirect`), ảnh trả lỗi → xếp vào cột ảnh.
+Bookmark quét riêng tab **Video** của thư viện ảnh, nên biết ngay id nào là video, không cần request nào thêm.
+Với link dán tay (hoặc khi bấm *Gửi ngay* trước khi quét tab Video), trang gọi `<id>=dv` với
+`redirect: 'manual'`: video trả 302 sang mp4 gốc (`opaqueredirect`), ảnh trả lỗi → cột ảnh.
+
+## Chỉ quét ô của thư viện ảnh
+
+Google Maps là SPA: chuyển địa điểm không tải lại trang, nên DOM và `performance` vẫn giữ ảnh của các
+địa điểm đã xem trước đó. Bookmark chỉ đọc các ô `[data-photo-index]` của thư viện đang mở để không lẫn.
