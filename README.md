@@ -9,8 +9,8 @@ Xem và copy link **ảnh gốc** (`=s0`) và **video gốc** (`=dv`, mp4) của
 
 1. Kéo nút **📍 Lấy ảnh Maps** trên trang lên thanh dấu trang (chỉ là bookmark, không cần cài extension).
    Không kéo được thì bấm **Copy code bookmark**, tạo bookmark mới và dán vào ô URL.
-2. Mở địa điểm trên Google Maps rồi bấm bookmark. Bookmark tự mở thư viện ảnh, tự cuộn đến cuối
-   (chờ ~2,5s ở cuối cho mạng chậm kịp nạp), quét tab **Video**, rồi mở trang này với ảnh (trái) và video (phải).
+2. Mở địa điểm trên Google Maps rồi bấm bookmark. Bookmark tự mở thư viện ảnh, chọn tab **Tất cả**, tự cuộn đến cuối
+   (chờ ~4s ở cuối cho mạng chậm kịp nạp), quét tab **Video**, rồi mở trang này với ảnh (trái) và video (phải).
    Khung nhỏ góc phải có **Gửi ngay** (không chờ cuộn hết) và **Huỷ**.
 3. Mỗi lần bấm bookmark **thay** danh sách cũ, nên các địa điểm không chồng lên nhau.
 

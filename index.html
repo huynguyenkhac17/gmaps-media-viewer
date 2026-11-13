@@ -423,6 +423,15 @@ function grab(APP) {
   const seeds = () => { const t = [...tiles()]; return t.length ? t : [...main().querySelectorAll('[style*="googleusercontent"],img[src*="googleusercontent"]')]; };
   const label = b => (b.getAttribute('aria-label') || b.textContent || '').trim();
   const byText = re => [...document.querySelectorAll('button,[role="tab"],[role="button"]')].find(b => vis(b) && re.test(label(b)));
+  /* Gallery tabs first (role=tab), so a "Tất cả" chip elsewhere (review filters) is not picked. */
+  const tabBy = re => [...document.querySelectorAll('[role="tab"]')].find(b => vis(b) && re.test(label(b))) || byText(re);
+  async function switchTab(tab) {
+    if (!tab || tab.getAttribute('aria-selected') === 'true') return;
+    const old = tiles()[0];
+    tab.click();
+    await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 5000);
+    await sleep(800);
+  }
   const waitFor = async (fn, ms) => { const end = Date.now() + ms; while (Date.now() < end && !abort) { const r = fn(); if (r) return r; await sleep(200); } return null; };
   const scroller = () => {
     for (const s of seeds().slice(0, 5))
@@ -455,7 +464,7 @@ function grab(APP) {
       scanTiles(set, sc); show();
       if (!sc) break;
       const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
-      if (end && sc.scrollHeight === lastH && set.size === lastN) { if (++idle >= 5) break; } else idle = 0;
+      if (end && sc.scrollHeight === lastH && set.size === lastN) { if (++idle >= 8) break; } else idle = 0;   /* ~4s at the end for slow networks */
       lastH = sc.scrollHeight; lastN = set.size;
       sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
       await sleep(500);
@@ -506,16 +515,17 @@ function grab(APP) {
   (async () => {
     await openGallery();
     if (abort) return;
-    msg.textContent = '📍 Đang cuộn mục ảnh…';
+    /* "Tất cả" holds every photo AND video; the default tab is often a subset (Mới nhất, a category). */
+    const allTab = tabBy(/^(tất cả|all)(\s|$)/i);
+    if (allTab) { msg.textContent = '📍 Đang mở tab Tất cả…'; await switchTab(allTab); }
+    msg.textContent = '📍 Đang cuộn tab Tất cả…';
     await scrollAll(ALL);
     let vt = 0;
-    const vtab = !stop && byText(/^videos?$/i);
+    /* Video tab only labels which ids are videos (no probing in the viewer) and gives dates. */
+    const vtab = !stop && tabBy(/^videos?$/i);
     if (vtab) {
       msg.textContent = '📍 Đang quét tab Video…';
-      const old = tiles()[0];
-      vtab.click();
-      await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 5000);
-      await sleep(800);
+      await switchTab(vtab);
       await scrollAll(VID);
       vt = stop ? 0 : 1;
       if (VID.size) await readDates();
