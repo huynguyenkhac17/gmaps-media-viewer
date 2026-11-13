@@ -10,14 +10,16 @@ Xem và copy link **ảnh gốc** (`=s0`) và **video gốc** (`=dv`, mp4) của
 1. Kéo nút **📍 Lấy ảnh Maps** trên trang lên thanh dấu trang (chỉ là bookmark, không cần cài extension).
    Không kéo được thì bấm **Copy code bookmark**, tạo bookmark mới và dán vào ô URL.
 2. Mở địa điểm trên Google Maps rồi bấm bookmark. Bookmark tự:
-   - mở tab **Bài đánh giá**, cuộn hết, bấm "Thêm" để lấy đủ nội dung, giữ các bình luận **có ảnh**
+   - mở tab **Bài đánh giá**, cuộn hết, bấm "Thêm" để lấy đủ nội dung bình luận kèm ảnh
      (tên, số sao, nội dung, các ảnh của bình luận đó; bỏ phản hồi của chủ quán);
-   - mở thư viện ảnh → tab **Video**, lấy video và đọc ngày đăng.
+   - quay về **Tổng quan**, mở thư viện ảnh → tab **Tất cả**: lấy mọi ảnh, kể cả ảnh không kèm bình luận
+     (ô có `aria-label="Video"` được tính là video);
+   - tab **Video**: bổ sung video và đọc ngày đăng.
    Khung nhỏ góc phải có **Gửi ngay** (không chờ cuộn hết) và **Huỷ**.
 3. Cột Ảnh nhóm theo bình luận; cột Video có ngày đăng (và bình luận nếu video nằm trong một bình luận).
    Mỗi lần bấm bookmark **thay** danh sách cũ, nên các địa điểm không chồng lên nhau.
 
-Không có tab Bài đánh giá thì bookmark lấy ảnh từ tab **Tất cả** của thư viện (không kèm bình luận).
+Ảnh không kèm bình luận nằm trong nhóm riêng. Ảnh đại diện của các tab thư viện (Mới nhất, Thực đơn…) được bỏ qua.
 Bình luận có nhiều ảnh hơn số Maps hiển thị (ô `+N`) được đánh dấu trên trang.
 Dữ liệu được nén (deflate) trong `#z=…` của URL; dòng trạng thái góc phải ghi bookmark đã thấy gì để dễ báo lỗi.
 

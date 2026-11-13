@@ -113,7 +113,7 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       <summary>Hướng dẫn</summary>
       <ol>
         <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
-        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (lấy bình luận kèm ảnh), rồi tab <b>Video</b> của thư viện (lấy video và ngày đăng), sau đó mở trang này. Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
+        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (bình luận kèm ảnh), mở thư viện → tab <b>Tất cả</b> (mọi ảnh, kể cả ảnh không kèm bình luận), rồi tab <b>Video</b> (video và ngày đăng), sau đó mở trang này. Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
         <li>Cột Ảnh nhóm theo từng bình luận: bấm nội dung để mở rộng, <b>Chọn ảnh</b> để tick cả nhóm, <b>Copy bình luận</b> để chép nội dung.</li>
         <li>Đã cập nhật bookmark? Xoá bookmark cũ và kéo lại nút mới.</li>
         <li>Chỉ dán link địa điểm thì chỉ lấy được ảnh có sẵn trong link (thường là ảnh bìa), vì Google không cho trang web khác đọc danh sách ảnh.</li>
@@ -344,7 +344,7 @@ function render() {
       for (const it of list) { const k = reviews[it.r] ? it.r : -1; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
       for (const [k, arr] of groups) {
         const g = k >= 0 ? reviewHead(reviews[k], arr) : Object.assign(document.createElement('div'), { className: 'rv' });
-        if (k < 0) g.appendChild(Object.assign(document.createElement('div'), { className: 'rvh', textContent: 'Ảnh khác' }));
+        if (k < 0) g.appendChild(Object.assign(document.createElement('div'), { className: 'rvh', textContent: 'Ảnh không kèm bình luận' }));
         const gr = document.createElement('div'); gr.className = 'grid';
         for (const it of arr) { gr.appendChild(it.el || makeCard(it)); updateCard(it); }
         g.appendChild(gr); frag.appendChild(g);
@@ -454,8 +454,10 @@ function grab(APP) {
       if (p.length > 19 && !/^(a|a-|ogw)\//.test(p)) set.add(p);
     }
   };
+  /* Skip tab rows: gallery tabs carry their own thumbnails (seen on real Maps), which are not items. */
+  const NOTAB = { acceptNode: n => /^(tab|tablist)$/.test(n.getAttribute('role') || '') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT };
   const scan = (root, set) => {
-    const t = document.createTreeWalker(root, 1);
+    const t = document.createTreeWalker(root, 1, NOTAB);
     for (let e = t.currentNode; e; e = t.nextNode()) {
       if (e.nodeType !== 1) continue;
       for (const a of e.attributes) add(a.value, set);
@@ -474,7 +476,7 @@ function grab(APP) {
   go.onclick = () => { stop = 1; };
   no.onclick = () => { stop = abort = 1; box.remove(); window.__gmvRun = 0; };
   row.append(go, no); box.append(msg, cnt, row); document.body.appendChild(box);
-  const show = () => { let n = ALL.size; if (typeof REV !== 'undefined') REV.forEach(v => n += v.p.size); cnt.textContent = `Ảnh: ${n} · Video: ${VID.size}`; };
+  const show = () => { const u = new Set(ALL); if (typeof REV !== 'undefined') REV.forEach(v => v.p.forEach(p => u.add(p))); VID.forEach(p => u.delete(p)); cnt.textContent = `Ảnh: ${u.size} · Video: ${VID.size}`; };
   /* --- page helpers --- */
   const main = () => document.querySelector('[role="main"]') || document.body;
   const vis = e => e && e.getClientRects().length > 0;
@@ -513,7 +515,9 @@ function grab(APP) {
   const gal = () => (galSc && galSc.isConnected ? galSc : (galSc = scroller()));
   const scanTiles = (set, sc, strict) => {
     const t = tiles();
-    if (t.length) t.forEach(e => scan(e, set)); else if (sc) scan(sc, set); else if (!strict) scan(main(), set);
+    /* Video tiles carry aria-label="Video" (seen on real Maps), so "Tất cả" already tells them apart. */
+    if (t.length) t.forEach(e => scan(e, !strict && labels(e).some(x => /^\s*video/i.test(x)) ? VID : set));
+    else if (sc) scan(sc, set); else if (!strict) scan(main(), set);
   };
   async function scrollAll(set, strict) {
     let sc = gal(), idle = 0, lastH = -1, lastN = -1;
@@ -669,7 +673,7 @@ function grab(APP) {
   };
   (async () => {
     const dg = [];
-    /* 1) Photos + their review text, from the "Bài đánh giá" tab */
+    /* 1) Review text + the photos of each review ("Bài đánh giá" tab) */
     const rtab = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(bài đánh giá|reviews?)(\s|$)/i));
     if (rtab) {
       msg.textContent = '📍 Đang mở tab Bài đánh giá…';
@@ -679,27 +683,31 @@ function grab(APP) {
       msg.textContent = '📍 Đang duyệt bình luận…';
       await scrollReviews();
       dg.push(`Bình luận: duyệt ${revSeen}, có ảnh ${REV.size}`);
-    } else {
-      /* Fallback: no Reviews tab -> photos from the gallery's "Tất cả" tab, without review text. */
-      dg.push('Không thấy tab Bài đánh giá (lấy ảnh từ thư viện). Các tab: ' + (tabNames() || '(không có)'));
+    } else dg.push('Không thấy tab Bài đánh giá');
+    if (abort) return;
+    /* 2) Every photo (also those posted without a review) from the gallery's "Tất cả" tab.
+          Go back to "Tổng quan" first so the cover photo (gallery entry) is the one clicked. */
+    if (!stop) {
       msg.textContent = '📍 Đang mở thư viện ảnh…';
+      const ov = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(tổng quan|overview)(\s|$)/i));
+      if (ov && !inGallery()) { ov.click(); await waitFor(() => document.querySelector('button[jsaction*="heroHeaderImage"]'), 4000); await sleep(600); }
       await openGallery();
-      const at = galTab(ARE); if (at) await switchTab(at);
-      msg.textContent = '📍 Đang cuộn thư viện ảnh…';
-      await scrollAll(ALL);
+      if (!inGallery()) dg.push('Không mở được thư viện ảnh. Các tab: ' + (tabNames() || '(không có)'));
+      const at = galTab(ARE);
+      if (at) { await switchTab(at); msg.textContent = '📍 Đang cuộn tab Tất cả…'; await scrollAll(ALL); dg.push(`Tất cả: ${ALL.size} ảnh, ${VID.size} video`); }
+      /* Last resort (no reviews, no gallery): whatever media the open panel shows. */
+      else if (!REV.size) { scan(main(), ALL); dg.push(`Quét trang: ${ALL.size}`); }
     }
     if (abort) return;
-    /* 2) Videos ONLY from the gallery's Video tab (+ upload dates) */
-    if (!stop) { msg.textContent = '📍 Đang mở thư viện ảnh…'; await openGallery(); }
+    /* 3) Video tab: any video still missing + upload dates */
     const vtab = !stop && galTab(VRE);
     if (vtab) {
       msg.textContent = '📍 Đang quét tab Video…';
       await switchTab(vtab);
       await scrollAll(VID, true);
-      if (!VID.size && !stop) { const sc = gal(); if (sc) { scan(sc, VID); show(); } }
       dg.push(`Video: ${VID.size}`);
       if (VID.size) await readDates();
-    } else if (!stop) dg.push('Không thấy tab Video. Các tab: ' + (tabNames() || '(không có)'));
+    } else if (!stop) dg.push('Không thấy tab Video');
     if (abort) return;
     const reviews = [...REV.values()].map(v => ({ a: v.a, s: v.s, t: v.t, p: [...v.p], m: v.more }));
     if (!reviews.length && !VID.size && !ALL.size) { msg.textContent = 'Không thấy ảnh/video nào. ' + dg.join(' · '); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
