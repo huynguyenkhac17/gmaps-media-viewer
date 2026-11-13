@@ -61,6 +61,19 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
 .card:hover .del{opacity:1}
 .foot{display:flex;gap:6px;padding:6px;align-items:center}
 .date{padding:0 8px 6px;font-size:12px;color:var(--muted)}
+.cmt{margin:0 8px 8px;padding:0;line-height:1.4;max-height:2.8em;font-size:12px;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.groups{padding:12px;display:flex;flex-direction:column;gap:14px}
+.rv{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.rvh{display:flex;align-items:center;gap:8px;padding:10px 12px 0;flex-wrap:wrap}
+.rvh b{font-size:13px}.rvh .stars{color:#f4b400;letter-spacing:1px}.rvh .sp{flex:1}
+.rvh .n{color:var(--muted);font-size:12px}.rvh button{padding:3px 8px;font-size:12px}
+.rvt{margin:6px 12px 0;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.rvt.open{display:block}
+.rvt.none{color:var(--muted);font-style:italic;cursor:default}
+.rvm{margin:4px 12px 0;color:var(--warn);font-size:12px}
+.rv .grid{padding:10px 12px 12px;grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.lbcap{color:#ddd;padding:10px 18px 14px;max-height:22vh;overflow:auto;font-size:14px;border-top:1px solid #333;white-space:pre-wrap}
+.lbcap b{color:#fff}
 .foot .id{flex:1;min-width:0;font:11px ui-monospace,Consolas,monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foot button{padding:4px 8px;font-size:12px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#202124;color:#fff;padding:9px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50;max-width:90vw}
@@ -100,7 +113,8 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       <summary>Hướng dẫn</summary>
       <ol>
         <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
-        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự mở mục ảnh, tự cuộn đến cuối, quét tab Video, rồi mở trang này với ảnh (trái) và video (phải). Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
+        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (lấy bình luận kèm ảnh), rồi tab <b>Video</b> của thư viện (lấy video và ngày đăng), sau đó mở trang này. Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
+        <li>Cột Ảnh nhóm theo từng bình luận: bấm nội dung để mở rộng, <b>Chọn ảnh</b> để tick cả nhóm, <b>Copy bình luận</b> để chép nội dung.</li>
         <li>Đã cập nhật bookmark? Xoá bookmark cũ và kéo lại nút mới.</li>
         <li>Chỉ dán link địa điểm thì chỉ lấy được ảnh có sẵn trong link (thường là ảnh bìa), vì Google không cho trang web khác đọc danh sách ảnh.</li>
         <li>Ảnh copy ra dạng <code>=s0</code> (gốc), video dạng <code>=dv</code> (mp4 gốc). Tick nhiều ô rồi <b>Copy đã chọn</b> → các link cách nhau dấu phẩy.</li>
@@ -143,6 +157,7 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
     <button class="nav p" id="lbprev" aria-label="Trước">‹</button>
     <button class="nav n" id="lbnext" aria-label="Sau">›</button>
   </div>
+  <div class="lbcap" id="lbcap" hidden></div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -198,7 +213,8 @@ function toDate15(raw, now = new Date()) {
 
 const $ = s => document.querySelector(s);
 const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', sel:false}
-const STORE = 'gmv.items.v1';
+const STORE = 'gmv.items.v1', RSTORE = 'gmv.reviews.v1';
+let reviews = [];                  // [{a: author, s: stars, t: text, m: hidden extra photos}]
 const cols = {};
 document.querySelectorAll('.col').forEach(c => cols[c.dataset.kind] = {
   el: c, grid: c.querySelector('[data-grid]'), empty: c.querySelector('[data-empty]'),
@@ -221,10 +237,14 @@ async function copyText(s, label) {
   toast(label || 'Đã copy');
 }
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw }) => [p, kind, date || '', dateRaw || '']))); } catch {}
+  try {
+    localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw, r }) => [p, kind, date || '', dateRaw || '', r ?? -1])));
+    localStorage.setItem(RSTORE, JSON.stringify(reviews));
+  } catch {}
 }
 function load() {
-  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw]) => items.set(p, { p, kind, date, dateRaw, sel: false })); } catch {}
+  try { reviews = JSON.parse(localStorage.getItem(RSTORE)) || []; } catch {}
+  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw, r]) => items.set(p, { p, kind, date, dateRaw, r: r ?? -1, sel: false })); } catch {}
 }
 const shortId = p => p.slice(-14);
 const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
@@ -250,9 +270,10 @@ function pump() {
   }
   status();
 }
+let diag = '';
 function status() {
   const pending = [...items.values()].filter(i => i.kind === 'pending').length;
-  $('#status').textContent = pending ? `Đang phân loại ảnh/video… còn ${pending}` : items.size ? `${items.size} mục` : '';
+  $('#status').textContent = pending ? `Đang phân loại ảnh/video… còn ${pending}` : (items.size ? `${items.size} mục` : '') + (diag ? ' · ' + diag : '');
 }
 
 /* ---------- render ---------- */
@@ -263,7 +284,7 @@ function cardHTML(it) {
       <div class="play" hidden><span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span></div>
       <span class="badge" hidden></span></div>
     <div class="foot"><span class="id"></span><button class="cp">Copy URL</button></div>
-    <div class="date" hidden></div>`;
+    <div class="date" hidden></div><div class="cmt" hidden></div>`;
 }
 function updateCard(it) {
   const c = it.el; if (!c) return;
@@ -279,6 +300,9 @@ function updateCard(it) {
   dt.hidden = it.kind !== 'video';
   dt.textContent = 'Ngày đăng: ' + (it.date || '—');
   dt.title = it.dateRaw ? 'Maps ghi: ' + it.dateRaw : 'Không có ngày (chỉ có khi lấy bằng bookmark)';
+  const cm = c.querySelector('.cmt'), rv = reviews[it.r];
+  cm.hidden = !(it.kind === 'video' && rv && rv.t);
+  if (!cm.hidden) { cm.textContent = rv.t; cm.title = (rv.a ? rv.a + ': ' : '') + rv.t; }
 }
 function makeCard(it) {
   const c = document.createElement('div'); c.className = 'card'; c.innerHTML = cardHTML(it);
@@ -291,10 +315,41 @@ function makeCard(it) {
   it.el = c; updateCard(it); return c;
 }
 function listOf(kind) { return [...items.values()].filter(i => kindOf(i) === kind); }
+function reviewHead(rv, arr) {
+  const g = document.createElement('div'); g.className = 'rv';
+  const h = document.createElement('div'); h.className = 'rvh';
+  const b = document.createElement('b'); b.textContent = rv.a || 'Khách';
+  const st = document.createElement('span'); st.className = 'stars'; st.textContent = rv.s ? '★'.repeat(rv.s) : '';
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = arr.length + ' ảnh';
+  const sp = document.createElement('span'); sp.className = 'sp';
+  const ck = document.createElement('button'); ck.textContent = 'Chọn ảnh';
+  ck.onclick = () => { const on = !arr.every(i => i.sel); arr.forEach(i => { i.sel = on; updateCard(i); }); syncHead(); };
+  const cp = document.createElement('button'); cp.textContent = 'Copy bình luận'; cp.disabled = !rv.t;
+  cp.onclick = () => copyText(rv.t, 'Đã copy bình luận');
+  h.append(b, st, n, sp, ck, cp);
+  const t = document.createElement('div'); t.className = 'rvt' + (rv.t ? '' : ' none');
+  t.textContent = rv.t || '(Không có nội dung)';
+  if (rv.t) t.onclick = () => t.classList.toggle('open');
+  g.append(h, t);
+  if (rv.m) { const m = document.createElement('div'); m.className = 'rvm'; m.textContent = `Bình luận này còn +${rv.m} ảnh Maps chưa hiển thị trong danh sách.`; g.appendChild(m); }
+  return g;
+}
 function render() {
   for (const kind of ['photo', 'video']) {
     const col = cols[kind], list = listOf(kind), frag = document.createDocumentFragment();
-    for (const it of list) { frag.appendChild(it.el || makeCard(it)); updateCard(it); }
+    const grouped = kind === 'photo' && list.some(i => reviews[i.r]);
+    col.grid.className = grouped ? 'groups' : 'grid';
+    if (grouped) {
+      const groups = new Map();
+      for (const it of list) { const k = reviews[it.r] ? it.r : -1; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(it); }
+      for (const [k, arr] of groups) {
+        const g = k >= 0 ? reviewHead(reviews[k], arr) : Object.assign(document.createElement('div'), { className: 'rv' });
+        if (k < 0) g.appendChild(Object.assign(document.createElement('div'), { className: 'rvh', textContent: 'Ảnh khác' }));
+        const gr = document.createElement('div'); gr.className = 'grid';
+        for (const it of arr) { gr.appendChild(it.el || makeCard(it)); updateCard(it); }
+        g.appendChild(gr); frag.appendChild(g);
+      }
+    } else for (const it of list) { frag.appendChild(it.el || makeCard(it)); updateCard(it); }
     col.grid.replaceChildren(frag);
     col.empty.hidden = list.length > 0;
     col.count.textContent = list.length;
@@ -323,7 +378,7 @@ for (const kind of ['photo', 'video']) {
 function addFrom(text) {
   const paths = extractPaths(text);
   let added = 0;
-  for (const p of paths) if (!items.has(p)) { const it = { p, kind: 'pending', sel: false }; items.set(p, it); classify(it); added++; }
+  for (const p of paths) if (!items.has(p)) { const it = { p, kind: 'pending', r: -1, sel: false }; items.set(p, it); classify(it); added++; }
   render(); save();
   if (!paths.length) toast('Không thấy link ảnh/video nào. Link địa điểm thường không chứa danh sách ảnh — dùng bookmark 📍.');
   else toast(`Thêm ${added} mục` + (paths.length - added ? `, bỏ ${paths.length - added} trùng` : ''));
@@ -332,7 +387,7 @@ function addFrom(text) {
 $('#add').onclick = () => { if (addFrom($('#src').value)) $('#src').value = ''; };
 $('#src').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#add').click(); });
 $('#src').addEventListener('paste', () => setTimeout(() => { if (extractPaths($('#src').value).length) $('#add').click(); }, 0));
-$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); setPlace(''); save(); render(); } };
+$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); reviews = []; diag = ''; setPlace(''); save(); render(); } };
 
 /* ---------- lightbox ---------- */
 let cur = null;
@@ -343,6 +398,10 @@ function openLB(it) {
   const url = urlOf(it), list = listOf(kindOf(it)), i = list.indexOf(it);
   $('#lbt').textContent = `${it.kind === 'video' ? 'Video' : 'Ảnh'} ${i + 1}/${list.length}${it.date ? ' · ' + it.date : ''} — ${url}`;
   $('#lbopen').href = url;
+  const rv = reviews[it.r], cap = $('#lbcap');
+  cap.hidden = !rv;
+  if (rv) { cap.replaceChildren(); const b = document.createElement('b'); b.textContent = (rv.a || 'Khách') + (rv.s ? '  ' + '★'.repeat(rv.s) : '');
+    cap.append(b, document.createElement('br'), rv.t || '(Không có nội dung)'); }
   const msg = Object.assign(document.createElement('div'), { className: 'lbmsg', textContent: 'Đang tải bản gốc…' });
   body.appendChild(msg);
   let m;
@@ -415,16 +474,20 @@ function grab(APP) {
   go.onclick = () => { stop = 1; };
   no.onclick = () => { stop = abort = 1; box.remove(); window.__gmvRun = 0; };
   row.append(go, no); box.append(msg, cnt, row); document.body.appendChild(box);
-  const show = () => { cnt.textContent = `Ảnh: ${[...ALL].filter(p => !VID.has(p)).length} · Video: ${VID.size}`; };
+  const show = () => { let n = ALL.size; if (typeof REV !== 'undefined') REV.forEach(v => n += v.p.size); cnt.textContent = `Ảnh: ${n} · Video: ${VID.size}`; };
   /* --- page helpers --- */
   const main = () => document.querySelector('[role="main"]') || document.body;
   const vis = e => e && e.getClientRects().length > 0;
   const tiles = () => document.querySelectorAll('[data-photo-index]');
   const seeds = () => { const t = [...tiles()]; return t.length ? t : [...main().querySelectorAll('[style*="googleusercontent"],img[src*="googleusercontent"]')]; };
-  const label = b => (b.getAttribute('aria-label') || b.textContent || '').trim();
-  const byText = re => [...document.querySelectorAll('button,[role="tab"],[role="button"]')].find(b => vis(b) && re.test(label(b)));
+  /* Test aria-label, visible text and title separately: a tab may be "Video (12)", icon + text, etc. */
+  const labels = b => [b.getAttribute('aria-label'), b.textContent, b.title].map(x => (x || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const label = b => labels(b)[0] || '';
+  const hit = (b, re) => vis(b) && labels(b).some(x => re.test(x));
+  const byText = re => [...document.querySelectorAll('button,[role="tab"],[role="button"]')].find(b => hit(b, re));
   /* Gallery tabs first (role=tab), so a "Tất cả" chip elsewhere (review filters) is not picked. */
-  const tabBy = re => [...document.querySelectorAll('[role="tab"]')].find(b => vis(b) && re.test(label(b))) || byText(re);
+  const tabBy = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re)) || byText(re);
+  const tabNames = () => [...document.querySelectorAll('[role="tab"]')].filter(vis).map(label).slice(0, 12).join(' | ');
   async function switchTab(tab) {
     if (!tab || tab.getAttribute('aria-selected') === 'true') return;
     const old = tiles()[0];
@@ -441,34 +504,29 @@ function grab(APP) {
       }
     return null;
   };
-  async function openGallery() {
-    if (tiles().length) return;
-    const hero = document.querySelector('button[jsaction*="heroHeaderImage"]')
-      || byText(/^(ảnh|photos?|xem ảnh|see photos)(\s|$)/i)
-      || [...main().querySelectorAll('img[src*="googleusercontent"],[style*="googleusercontent"]')]
-           .map(e => e.closest('button,a,[jsaction]')).find(Boolean);
-    if (!hero) return;
-    hero.click();
-    await waitFor(() => tiles().length, 8000);
-    await sleep(600);
-  }
   /* Scroll step by step (lazy tiles only get their image when on screen); stop when the end
      stays the same for ~2.5s, so slow networks still get time to load the next batch. */
   /* Only the open place's gallery tiles: Maps is an SPA, so the rest of the page (and the
      performance entries) still hold photos of places visited earlier. */
-  const scanTiles = (set, sc) => { const t = tiles(); if (t.length) t.forEach(e => scan(e, set)); else scan(sc || main(), set); };
-  async function scrollAll(set) {
-    let sc = scroller(), idle = 0, lastH = -1, lastN = -1;
+  /* strict (Video tab): never fall back to the whole panel, only the gallery list. */
+  let galSc = null;
+  const gal = () => (galSc && galSc.isConnected ? galSc : (galSc = scroller()));
+  const scanTiles = (set, sc, strict) => {
+    const t = tiles();
+    if (t.length) t.forEach(e => scan(e, set)); else if (sc) scan(sc, set); else if (!strict) scan(main(), set);
+  };
+  async function scrollAll(set, strict) {
+    let sc = gal(), idle = 0, lastH = -1, lastN = -1;
     const t0 = Date.now();
     while (!stop && Date.now() - t0 < 180000) {
-      scanTiles(set, sc); show();
+      scanTiles(set, sc, strict); show();
       if (!sc) break;
       const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
       if (end && sc.scrollHeight === lastH && set.size === lastN) { if (++idle >= 8) break; } else idle = 0;   /* ~4s at the end for slow networks */
       lastH = sc.scrollHeight; lastN = set.size;
       sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
       await sleep(500);
-      if (!sc.isConnected) sc = scroller();
+      if (!sc.isConnected) sc = gal();
     }
   }
   /* Upload date: Maps only shows it for the OPEN item, so click each video tile and take the
@@ -486,13 +544,19 @@ function grab(APP) {
     return r;
   };
   const DATES = {};
+  /* Video tiles: [data-photo-index] if Maps uses it there, else any thumbnail in the gallery list. */
+  const vtiles = () => {
+    const t = [...tiles()]; if (t.length) return t;
+    const sc = gal();
+    return sc ? [...sc.querySelectorAll('[style*="googleusercontent"],img[src*="googleusercontent"]')].map(e => e.closest('a,button,[jsaction]') || e) : [];
+  };
   async function readDates() {
     const idOf = t => { const s = new Set(); scan(t, s); return [...s][0]; };
-    const done = new Set(), sc = scroller();
+    const done = new Set(), sc = gal();
     let last = '', guard = 0;
     if (sc) { sc.scrollTop = 0; await sleep(500); }
     while (!stop && done.size < VID.size && guard++ < VID.size * 4 + 10) {
-      const t = [...tiles()].find(x => { const id = idOf(x); return id && VID.has(id) && !done.has(id); });
+      const t = vtiles().find(x => { const id = idOf(x); return id && VID.has(id) && !done.has(id); });
       if (!t) {
         if (!sc) break;
         const before = sc.scrollTop; sc.scrollBy(0, sc.clientHeight * 0.85); await sleep(500);
@@ -512,32 +576,136 @@ function grab(APP) {
       if (pick) DATES[id] = last = pick;
     }
   }
+  const VRE = /^\s*videos?(\s|\(|·|,|:|\d|$)/i, ARE = /^(tất cả|all)(\s|$)/i;
+  const galTab = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re));
+  const inGallery = () => galTab(VRE) || galTab(ARE);
+  async function openGallery() {
+    if (inGallery()) return;
+    const hero = document.querySelector('button[jsaction*="heroHeaderImage"]')
+      || byText(/^(ảnh|photos?|xem ảnh|see photos)(\s|$)/i)
+      || [...main().querySelectorAll('img[src*="googleusercontent"],[style*="googleusercontent"]')]
+           .map(e => e.closest('button,a,[jsaction]')).find(Boolean);
+    if (!hero) return;
+    hero.click();
+    await waitFor(() => inGallery() || tiles().length, 8000);
+    await sleep(600);
+  }
+  /* --- Reviews tab: each [data-review-id] block -> author, stars, full text, its photos --- */
+  const REV = new Map();   /* review id -> {a, s, t, p:Set, more} */
+  let revSeen = 0;
+  const outerReviews = () => {
+    const m = new Map();
+    for (const e of document.querySelectorAll('[data-review-id]')) {
+      const id = e.getAttribute('data-review-id');
+      if (m.has(id)) continue;
+      let up = e.parentElement, nested = false;
+      for (; up; up = up.parentElement) if (up.getAttribute && up.getAttribute('data-review-id') === id) { nested = true; break; }
+      if (!nested) m.set(id, e);
+    }
+    return m;
+  };
+  const OWNER = '.CDe7pd';
+  const revText = r => {
+    const w = [...r.querySelectorAll('.wiI7pd')].find(e => !e.closest(OWNER));
+    if (w) return w.textContent.replace(/\s+/g, ' ').trim();
+    let best = '';
+    for (const e of r.querySelectorAll('span,div')) {
+      if (e.childElementCount || e.closest('button,' + OWNER)) continue;
+      const t = e.textContent.replace(/\s+/g, ' ').trim();
+      if (t.length > best.length && !DRE.test(t)) best = t;
+    }
+    return best;
+  };
+  const revAuthor = r => (r.getAttribute('aria-label') || (r.querySelector('.d4r55') || {}).textContent || '').trim();
+  const revStars = r => { for (const e of r.querySelectorAll('[aria-label]')) { const m = e.getAttribute('aria-label').match(/^\s*(\d)(?:[.,]\d)?\s*(?:sao|stars?)/i); if (m) return +m[1]; } return 0; };
+  const revMore = r => { for (const e of r.querySelectorAll('*')) if (e.childElementCount === 0) { const m = (e.textContent || '').trim().match(/^\+(\d+)$/); if (m) return +m[1]; } return 0; };
+  function readReviews() {
+    const m = outerReviews(); revSeen = Math.max(revSeen, m.size);
+    for (const [id, r] of m) {
+      if (!r.__gmvOpen) {   /* expand "Thêm"/"More" once so the full text is in the DOM */
+        r.__gmvOpen = 1;
+        for (const b of r.querySelectorAll('button,[role="button"]'))
+          if (!b.closest(OWNER) && labels(b).some(x => /^(thêm|xem thêm|more|see more|read more)$/i.test(x))) { try { b.click(); } catch (e) {} }
+      }
+      const ps = new Set(); scan(r, ps);
+      if (!ps.size) continue;
+      const cur = REV.get(id) || { a: '', s: 0, t: '', p: new Set(), more: 0 };
+      ps.forEach(p => cur.p.add(p));
+      const t = revText(r); if (t.length > cur.t.length) cur.t = t;
+      cur.a = cur.a || revAuthor(r); cur.s = cur.s || revStars(r); cur.more = Math.max(cur.more, revMore(r));
+      REV.set(id, cur);
+    }
+    let n = 0; REV.forEach(v => n += v.p.size);
+    cnt.textContent = `Đã duyệt ${revSeen} bình luận · ${REV.size} có ảnh · ${n} ảnh`;
+  }
+  const revScroller = () => {
+    const r = document.querySelector('[data-review-id]');
+    for (let e = r && r.parentElement; e && e !== document.body; e = e.parentElement) {
+      const o = getComputedStyle(e).overflowY;
+      if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 20) return e;
+    }
+    return null;
+  };
+  async function scrollReviews() {
+    let sc = null, idle = 0, lastH = -1, lastN = -1;
+    const t0 = Date.now();
+    while (!stop && Date.now() - t0 < 900000) {
+      readReviews();
+      if (!sc || !sc.isConnected) sc = revScroller();
+      if (!sc) break;
+      const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
+      if (end && sc.scrollHeight === lastH && revSeen === lastN) { if (++idle >= 8) break; } else idle = 0;
+      lastH = sc.scrollHeight; lastN = revSeen;
+      sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
+      await sleep(500);
+    }
+    await sleep(300); readReviews();   /* pick up text expanded by the last "Thêm" clicks */
+  }
+  const pack = async obj => {
+    const s = new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const u = new Uint8Array(await new Response(s).arrayBuffer());
+    let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
   (async () => {
-    await openGallery();
+    const dg = [];
+    /* 1) Photos + their review text, from the "Bài đánh giá" tab */
+    const rtab = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(bài đánh giá|reviews?)(\s|$)/i));
+    if (rtab) {
+      msg.textContent = '📍 Đang mở tab Bài đánh giá…';
+      if (rtab.getAttribute('aria-selected') !== 'true') rtab.click();
+      await waitFor(() => document.querySelector('[data-review-id]'), 8000);
+      await sleep(800);
+      msg.textContent = '📍 Đang duyệt bình luận…';
+      await scrollReviews();
+      dg.push(`Bình luận: duyệt ${revSeen}, có ảnh ${REV.size}`);
+    } else {
+      /* Fallback: no Reviews tab -> photos from the gallery's "Tất cả" tab, without review text. */
+      dg.push('Không thấy tab Bài đánh giá (lấy ảnh từ thư viện). Các tab: ' + (tabNames() || '(không có)'));
+      msg.textContent = '📍 Đang mở thư viện ảnh…';
+      await openGallery();
+      const at = galTab(ARE); if (at) await switchTab(at);
+      msg.textContent = '📍 Đang cuộn thư viện ảnh…';
+      await scrollAll(ALL);
+    }
     if (abort) return;
-    /* "Tất cả" holds every photo AND video; the default tab is often a subset (Mới nhất, a category). */
-    const allTab = tabBy(/^(tất cả|all)(\s|$)/i);
-    if (allTab) { msg.textContent = '📍 Đang mở tab Tất cả…'; await switchTab(allTab); }
-    msg.textContent = '📍 Đang cuộn tab Tất cả…';
-    await scrollAll(ALL);
-    let vt = 0;
-    /* Video tab only labels which ids are videos (no probing in the viewer) and gives dates. */
-    const vtab = !stop && tabBy(/^videos?$/i);
+    /* 2) Videos ONLY from the gallery's Video tab (+ upload dates) */
+    if (!stop) { msg.textContent = '📍 Đang mở thư viện ảnh…'; await openGallery(); }
+    const vtab = !stop && galTab(VRE);
     if (vtab) {
       msg.textContent = '📍 Đang quét tab Video…';
       await switchTab(vtab);
-      await scrollAll(VID);
-      vt = stop ? 0 : 1;
+      await scrollAll(VID, true);
+      if (!VID.size && !stop) { const sc = gal(); if (sc) { scan(sc, VID); show(); } }
+      dg.push(`Video: ${VID.size}`);
       if (VID.size) await readDates();
-    }
+    } else if (!stop) dg.push('Không thấy tab Video. Các tab: ' + (tabNames() || '(không có)'));
     if (abort) return;
-    if (!ALL.size && !VID.size) scan(main(), ALL);
-    show();
-    const photos = [...ALL].filter(p => !VID.has(p));
-    if (!photos.length && !VID.size) { msg.textContent = 'Không thấy ảnh/video nào. Hãy mở một địa điểm trên Google Maps.'; go.remove(); no.textContent = 'Đóng'; return; }
+    const reviews = [...REV.values()].map(v => ({ a: v.a, s: v.s, t: v.t, p: [...v.p], m: v.more }));
+    if (!reviews.length && !VID.size && !ALL.size) { msg.textContent = 'Không thấy ảnh/video nào. ' + dg.join(' · '); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
     const h1 = document.querySelector('[role="main"] h1, h1');
-    const q = new URLSearchParams({ new: '1', vt: String(vt), n: h1 ? h1.textContent.trim() : '', p: photos.join(','), v: [...VID].join(','), vd: JSON.stringify(DATES) });
-    const url = APP + '#' + q;
+    const z = await pack({ n: h1 ? h1.textContent.trim() : '', dg: dg.join(' · '), r: reviews, x: [...ALL], v: [...VID].map(p => [p, DATES[p] || '']) });
+    const url = APP + '#z=' + z;
     window.__gmvRun = 0;
     const w = window.open(url, 'gmv-viewer');
     if (w) { msg.textContent = '✓ Đã gửi sang GMaps Media Viewer'; row.remove(); setTimeout(() => box.remove(), 2500); return; }
@@ -556,20 +724,40 @@ $('#bmcopy').onclick = () => copyText('javascript:' + encodeURIComponent(BM_SRC)
 /* ---------- boot ---------- */
 // Data from the bookmarklet: replaces the current list (a new place), and when the Video tab was
 // scanned (vt=1) every kind is already known, so nothing needs probing.
-function ingest(hash) {
+// Bookmark payload v2 (#z=…): deflate-raw + base64url JSON
+//   {n: place, dg: diagnostics, r: [{a, s, t, p:[ids], m}], x: [photo ids w/o review], v: [[id, dateText]]}
+async function unpack(z) {
+  const b = atob(z.replace(/-/g, '+').replace(/_/g, '/'));
+  const u = Uint8Array.from(b, c => c.charCodeAt(0));
+  const st = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return JSON.parse(await new Response(st).text());
+}
+async function ingest(hash) {
   const q = new URLSearchParams(hash.replace(/^#/, ''));
-  if (!q.has('p') && !q.has('v')) return false;
-  if (q.get('new') === '1') { items.clear(); setPlace(q.get('n') || ''); }
-  const known = q.get('vt') === '1';
-  let raw = {}; try { raw = JSON.parse(q.get('vd') || '{}'); } catch {}
-  for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', sel: false, dateRaw: raw[p] || '', date: toDate15(raw[p]) });
-  for (const p of extractPaths(q.get('p') || '')) if (!items.has(p)) {
-    const it = { p, kind: known ? 'photo' : 'pending', sel: false }; items.set(p, it);
-    if (!known) classify(it);
-  }
+  if (!q.has('z') && !q.has('p') && !q.has('v')) return false;
   history.replaceState(null, '', location.pathname);
+  if (q.has('z')) {
+    let d; try { d = await unpack(q.get('z')); } catch (e) { toast('Dữ liệu từ bookmark bị hỏng: ' + e.message); return true; }
+    items.clear(); reviews = (d.r || []).map(({ a, s, t, m }) => ({ a, s, t, m }));
+    setPlace(d.n || ''); diag = d.dg || '';
+    const vids = new Map((d.v || []).map(([p, raw]) => [p, raw]));
+    const revOf = new Map(); (d.r || []).forEach((r, i) => r.p.forEach(p => revOf.has(p) || revOf.set(p, i)));
+    (d.r || []).forEach((r, i) => r.p.forEach(p => { if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: i, sel: false }); }));
+    for (const p of d.x || []) if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: -1, sel: false });
+    for (const [p, raw] of vids) items.set(p, { p, kind: 'video', r: revOf.has(p) ? revOf.get(p) : -1, sel: false, dateRaw: raw, date: toDate15(raw) });
+  } else {   // legacy links (#p=…&v=…)
+    if (q.get('new') === '1') { items.clear(); reviews = []; setPlace(q.get('n') || ''); }
+    diag = q.get('dg') || '';
+    const known = q.get('vt') === '1';
+    let raw = {}; try { raw = JSON.parse(q.get('vd') || '{}'); } catch {}
+    for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', r: -1, sel: false, dateRaw: raw[p] || '', date: toDate15(raw[p]) });
+    for (const p of extractPaths(q.get('p') || '')) if (!items.has(p)) {
+      const it = { p, kind: known ? 'photo' : 'pending', r: -1, sel: false }; items.set(p, it);
+      if (!known) classify(it);
+    }
+  }
   render(); save();
-  toast(`Nhận ${items.size} mục từ Google Maps`);
+  toast(`Nhận ${reviews.length ? reviews.length + ' bình luận, ' : ''}${items.size} mục từ Google Maps`);
   return true;
 }
 function setPlace(n) {
@@ -579,7 +767,8 @@ function setPlace(n) {
 try { setPlace(localStorage.getItem('gmv.place') || ''); } catch {}
 load();
 for (const it of items.values()) if (it.kind === 'pending') classify(it);
-if (!ingest(location.hash)) render();
+render();
+ingest(location.hash);
 window.addEventListener('hashchange', () => ingest(location.hash));   // reused 'gmv-viewer' tab
 </script>
 </body>
