@@ -254,26 +254,38 @@ const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
    With redirect:'manual' a redirect shows up as an opaqueredirect response. */
 const queue = []; let running = 0; const LIMIT = 10;
 function classify(it) { queue.push(it); pump(); }
+const probe = p => fetch(videoUrl(p), { redirect: 'manual', referrerPolicy: 'no-referrer', cache: 'no-store' })
+  .then(r => r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400) ? 'video' : 'photo', () => 'error');
+async function check(p) {   // a network hiccup must not turn a real video into a photo: retry errors
+  let k = await probe(p);
+  for (let i = 0; k === 'error' && i < 2; i++) { await new Promise(r => setTimeout(r, 800)); k = await probe(p); }
+  return k === 'video' ? 'video' : 'photo';
+}
+let fixedN = 0;
 function pump() {
   while (running < LIMIT && queue.length) {
     const it = queue.shift(); running++;
-    fetch(videoUrl(it.p), { redirect: 'manual', referrerPolicy: 'no-referrer', cache: 'force-cache' })
-      .then(r => r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400) ? 'video' : 'photo', () => 'photo')
+    check(it.p)
       .then(kind => {
         if (!items.has(it.p)) return;
+        if (it.checking && kind !== 'video') { fixedN++; it.date = it.dateRaw = ''; }
+        it.checking = false;
         const moved = kind !== kindOf(it);
         it.kind = kind;
         moved ? render() : updateCard(it);
         save();
       })
-      .finally(() => { running--; status(); pump(); });
+      .finally(() => {
+        running--; status(); pump();
+        if (!running && !queue.length && fixedN) { toast(`Đã chuyển ${fixedN} mục từ Video sang Ảnh (không phải video)`); fixedN = 0; }
+      });
   }
   status();
 }
 let diag = '';
 function status() {
-  const pending = [...items.values()].filter(i => i.kind === 'pending').length;
-  $('#status').textContent = pending ? `Đang phân loại ảnh/video… còn ${pending}` : (items.size ? `${items.size} mục` : '') + (diag ? ' · ' + diag : '');
+  const pending = [...items.values()].filter(i => i.kind === 'pending' || i.checking).length;
+  $('#status').textContent = pending ? `Đang kiểm tra ảnh/video… còn ${pending}` : (items.size ? `${items.size} mục` : '') + (diag ? ' · ' + diag : '');
 }
 
 /* ---------- render ---------- */
@@ -293,7 +305,7 @@ function updateCard(it) {
   c.querySelector('.play').hidden = it.kind !== 'video';
   const b = c.querySelector('.badge');
   b.hidden = it.kind === 'photo';
-  b.textContent = it.kind === 'pending' ? 'đang kiểm tra…' : 'MP4';
+  b.textContent = it.kind === 'pending' || it.checking ? 'đang kiểm tra…' : 'MP4';
   c.querySelector('.id').textContent = '…' + shortId(it.p);
   c.querySelector('.id').title = urlOf(it);
   const dt = c.querySelector('.date');
@@ -494,6 +506,7 @@ function grab(APP) {
     if (!tab || tab.getAttribute('aria-selected') === 'true') return;
     const old = tiles()[0];
     tab.click();
+    if (tab.hasAttribute('aria-selected')) await waitFor(() => tab.getAttribute('aria-selected') === 'true', 5000);
     await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 5000);
     await sleep(800);
   }
@@ -513,10 +526,19 @@ function grab(APP) {
   /* strict (Video tab): never fall back to the whole panel, only the gallery list. */
   let galSc = null;
   const gal = () => (galSc && galSc.isConnected ? galSc : (galSc = scroller()));
+  const isVideoTile = e => /^\s*video/i.test(e.getAttribute('aria-label') || '');
   const scanTiles = (set, sc, strict) => {
-    const t = tiles();
-    /* Video tiles carry aria-label="Video" (seen on real Maps), so "Tất cả" already tells them apart. */
-    if (t.length) t.forEach(e => scan(e, !strict && labels(e).some(x => /^\s*video/i.test(x)) ? VID : set));
+    const t = [...tiles()];
+    /* Video tiles carry aria-label="Video" (seen on real Maps), so "Tất cả" already tells them apart.
+       Video tab (strict): accept ONLY such tiles, so photo tiles still on screen while a slow tab
+       switch loads are never taken for videos. Unlabelled tiles count only if no tile has a label. */
+    if (t.length) {
+      const labelled = t.some(e => e.hasAttribute('aria-label'));
+      t.forEach(e => {
+        const v = isVideoTile(e);
+        if (strict) { if (v || !labelled) scan(e, set); } else scan(e, v ? VID : set);
+      });
+    }
     else if (sc) scan(sc, set); else if (!strict) scan(main(), set);
   };
   async function scrollAll(set, strict) {
@@ -672,6 +694,12 @@ function grab(APP) {
     return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   };
   (async () => {
+    try { await run(); }
+    catch (e) {   /* never leave the overlay frozen: show the error so it can be reported */
+      window.__gmvRun = 0; msg.textContent = '⚠ Lỗi: ' + (e && e.message || e); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove();
+    }
+  })();
+  async function run() {
     const dg = [];
     /* 1) Review text + the photos of each review ("Bài đánh giá" tab) */
     const rtab = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(bài đánh giá|reviews?)(\s|$)/i));
@@ -721,7 +749,7 @@ function grab(APP) {
     msg.textContent = '✓ Xong! Bấm để mở kết quả';
     go.textContent = 'Mở kết quả'; go.onclick = () => { window.open(url, 'gmv-viewer'); box.remove(); };
     no.textContent = 'Đóng'; no.onclick = () => box.remove();
-  })();
+  }
 }
 const APP = location.origin + location.pathname;
 const BM_SRC = `(${grab})(${JSON.stringify(APP)})`;
@@ -752,7 +780,10 @@ async function ingest(hash) {
     const revOf = new Map(); (d.r || []).forEach((r, i) => r.p.forEach(p => revOf.has(p) || revOf.set(p, i)));
     (d.r || []).forEach((r, i) => r.p.forEach(p => { if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: i, sel: false }); }));
     for (const p of d.x || []) if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: -1, sel: false });
-    for (const [p, raw] of vids) items.set(p, { p, kind: 'video', r: revOf.has(p) ? revOf.get(p) : -1, sel: false, dateRaw: raw, date: toDate15(raw) });
+    for (const [p, raw] of vids) {
+      const it = { p, kind: 'video', r: revOf.has(p) ? revOf.get(p) : -1, sel: false, dateRaw: raw, date: toDate15(raw), checking: true };
+      items.set(p, it); classify(it);   // safety net: =dv must redirect, or it is a photo
+    }
   } else {   // legacy links (#p=…&v=…)
     if (q.get('new') === '1') { items.clear(); reviews = []; setPlace(q.get('n') || ''); }
     diag = q.get('dg') || '';
