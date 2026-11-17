@@ -1,52 +1,101 @@
 # GMaps Media Viewer
 
-Xem và copy link **ảnh gốc** (`=s0`) và **video gốc** (`=dv`, mp4) của một địa điểm Google Maps.
-Ảnh ở cột trái, video ở cột phải; click để xem, tick nhiều mục để copy các link cách nhau dấu phẩy.
+Lấy **ảnh gốc** (`=s0`), **video gốc** (`=dv`, mp4) và **bình luận kèm ảnh** của một địa điểm Google Maps.
+Ảnh ở cột trái (nhóm theo bình luận), video ở cột phải (kèm ngày đăng). Click để xem, tick nhiều mục để copy
+các link cách nhau dấu phẩy.
 
 **Dùng ngay:** https://huynguyenkhac17.github.io/gmaps-media-viewer/
 
+Yêu cầu: Chrome hoặc Edge trên máy tính. Không cần cài extension hay phần mềm.
+
 ## Cách dùng
 
-1. Kéo nút **📍 Lấy ảnh Maps** trên trang lên thanh dấu trang (chỉ là bookmark, không cần cài extension).
+1. Mở trang trên, kéo nút đỏ **📍 Lấy ảnh Maps** lên thanh dấu trang (Ctrl+Shift+B để hiện thanh).
    Không kéo được thì bấm **Copy code bookmark**, tạo bookmark mới và dán vào ô URL.
-2. Mở địa điểm trên Google Maps rồi bấm bookmark. Bookmark tự:
-   - mở tab **Bài đánh giá**, cuộn hết, bấm "Thêm" để lấy đủ nội dung bình luận kèm ảnh
-     (tên, số sao, nội dung, các ảnh của bình luận đó; bỏ phản hồi của chủ quán);
-   - quay về **Tổng quan**, mở thư viện ảnh → tab **Tất cả**: lấy mọi ảnh, kể cả ảnh không kèm bình luận
-     (ô có `aria-label="Video"` được tính là video);
-   - tab **Video**: bổ sung video và đọc ngày đăng.
-   Khung nhỏ góc phải có **Gửi ngay** (không chờ cuộn hết) và **Huỷ**.
-3. Cột Ảnh nhóm theo bình luận; cột Video có ngày đăng (và bình luận nếu video nằm trong một bình luận).
-   Mỗi lần bấm bookmark **thay** danh sách cũ, nên các địa điểm không chồng lên nhau.
+2. Mở một địa điểm trên Google Maps (đang ở trang thông tin của địa điểm), rồi bấm bookmark đó.
+3. Chờ khung nhỏ ở góc phải chạy xong 3 bước:
+   - **Bài đánh giá**: cuộn hết, mở "Thêm", lấy tên, số sao, nội dung và ảnh của từng bình luận có ảnh
+     (bỏ phản hồi của chủ quán);
+   - **Thư viện → tab Tất cả**: lấy mọi ảnh, kể cả ảnh không kèm bình luận; ô gắn nhãn "Video" là video;
+   - **Thư viện → tab Video**: bổ sung video và mở từng video để đọc ngày đăng.
+4. Trang kết quả tự mở. Nếu trình duyệt chặn cửa sổ bật lên, bấm **Mở kết quả** trên khung nhỏ.
 
-Ảnh không kèm bình luận nằm trong nhóm riêng. Ảnh đại diện của các tab thư viện (Mới nhất, Thực đơn…) được bỏ qua.
-Bình luận có nhiều ảnh hơn số Maps hiển thị (ô `+N`) được đánh dấu trên trang.
-Dữ liệu được nén (deflate) trong `#z=…` của URL; dòng trạng thái góc phải ghi bookmark đã thấy gì để dễ báo lỗi.
+Ba nút trên khung nhỏ:
 
-Cập nhật bookmark: xoá bookmark cũ, kéo lại nút mới trên trang.
+| Nút | Tác dụng |
+| --- | --- |
+| **Bỏ qua bước** | Kết thúc bước đang chạy, làm tiếp bước sau (ví dụ địa điểm quá nhiều bình luận) |
+| **Gửi ngay** | Dừng tất cả, gửi những gì đã lấy được. Các bước chưa chạy sẽ **không có dữ liệu** |
+| **Huỷ** | Dừng và không gửi gì |
 
-Cũng có thể dán thẳng vào ô nhập: link Maps của ảnh/video, link lh3, CSS `background-image`, hoặc danh sách URL.
+Mỗi lần bấm bookmark **thay** danh sách cũ, nên các địa điểm không chồng lên nhau.
+Cũng có thể dán thẳng vào ô nhập: link Maps của một ảnh/video, link lh3, hoặc cả danh sách URL.
 
-## Vì sao cần bookmark
+## Khi kết quả thiếu hoặc sai
 
-Trang chạy trên GitHub Pages (web tĩnh). Trình duyệt chặn trang khác đọc dữ liệu Google Maps (CORS),
-nên một link địa điểm chỉ cho được ảnh nằm sẵn trong link. Bookmark chạy ngay trên tab Maps của bạn
-(IP và phiên của chính bạn) để gom link lh3 trong DOM, rồi chuyển sang trang này qua `#p=…`. Không có server, không lưu gì ngoài `localStorage` của trình duyệt bạn.
+Dòng trạng thái ở góc phải trên cùng ghi lại bookmark đã thấy gì, ví dụ:
 
-## Phân biệt ảnh / video
+`61 mục · Bình luận: duyệt 60, có ảnh 20 · Tất cả: 58 ảnh, 3 video · Video: 3 · Ảnh bình luận có trong thư viện: 51/51`
 
-Bookmark quét riêng tab **Video** của thư viện ảnh, nên biết ngay id nào là video, không cần request nào thêm.
-Với link dán tay (hoặc khi bấm *Gửi ngay* trước khi quét tab Video), trang gọi `<id>=dv` với
-`redirect: 'manual'`: video trả 302 sang mp4 gốc (`opaqueredirect`), ảnh trả lỗi → cột ảnh.
+Bấm vào dòng đó để copy rồi gửi cho người phụ trách. Cách đọc:
 
-## Ngày đăng video
+- `Đã bấm Gửi ngay/Bỏ qua ở bước …`: thiếu dữ liệu là do dừng sớm.
+- `Tất cả: 0 ảnh` hoặc `Không mở được thư viện ảnh`: Maps không mở/nạp kịp thư viện; chạy lại.
+- `N ô chưa nạp`: còn N ô ảnh Maps chưa tải xong thumbnail.
+- `Ảnh bình luận có trong thư viện: 0/N`: ảnh trong bình luận và trong thư viện dùng hai kiểu link khác nhau
+  (trang xem đã gộp theo mã ảnh; nếu vẫn thấy ảnh trùng thì báo lại).
 
-Maps chỉ hiện ngày đăng khi một video đang được mở, và chỉ ở dạng tháng/năm (`Tháng 5 2024`, `May 2024`)
-hoặc tương đối (`3 tuần trước`). Bookmark lần lượt mở từng video trong tab Video, đọc dòng ngày vừa xuất hiện,
-rồi trang xem quy đổi thành **`15/mm/yyyy`** (ngày cố định là 15; thời gian tương đối tính lùi từ lúc quét).
-Rê chuột lên dòng ngày để xem chữ gốc Maps ghi. Video dán tay thì không có ngày.
+Trang báo **bookmark là bản cũ**: xoá bookmark đó và kéo lại nút mới. Code nằm ngay trong bookmark nên bản cũ không tự cập nhật.
 
-## Chỉ quét ô của thư viện ảnh
+## Mạng chậm
 
-Google Maps là SPA: chuyển địa điểm không tải lại trang, nên DOM và `performance` vẫn giữ ảnh của các
-địa điểm đã xem trước đó. Bookmark chỉ đọc các ô `[data-photo-index]` của thư viện đang mở để không lẫn.
+Bookmark không dùng thời gian chờ cố định: khi danh sách chưa hiện gì nó chờ tối đa 20 giây; ở cuối danh sách
+nó chờ ít nhất 8 giây, hoặc gấp 3 lần thời gian đợt trước cần để nạp (tối đa 30 giây). Ô ảnh chưa kịp có
+thumbnail được quay lại lần nữa. Đổi lại, mỗi bước mất thêm khoảng 8 giây ở cuối.
+
+## Giới hạn đã biết
+
+- Thời gian chạy tỉ lệ với số bình luận: khoảng 5 bình luận mỗi giây, tức vài phút cho địa điểm có trên 1.000 bình luận.
+- Bình luận có nhiều ảnh hơn số Maps hiển thị (ô `+N`): các ảnh ẩn chỉ lấy được từ thư viện, không gắn được vào bình luận đó.
+- Ngày đăng chỉ có độ chính xác tháng/năm (Maps không hiện ngày), ghi thành `15/mm/yyyy`; với "3 tuần trước"
+  thì tính lùi từ lúc quét. Rê chuột lên dòng ngày để xem chữ gốc.
+- Bookmark dựa vào cấu trúc trang Google Maps (`data-review-id`, `data-photo-index`, nhãn tab tiếng Việt/Anh).
+  Google đổi giao diện thì phải sửa bookmark.
+- Điện thoại không dùng được bookmark; trang xem thì vẫn mở được.
+
+## Dữ liệu đi đâu
+
+Không có server. Bookmark chạy trong tab Maps của chính bạn, nén kết quả vào phần `#z=…` của địa chỉ
+(phần này trình duyệt không gửi lên máy chủ nào) rồi mở trang xem. Trang xem chỉ lưu trong `localStorage`
+của trình duyệt bạn. Trang xem coi dữ liệu trong link là không tin cậy: chỉ nhận mã ảnh đúng định dạng và
+hiển thị mọi chữ dưới dạng văn bản thuần.
+
+Ảnh, video và bình luận thuộc về người đăng và chịu điều khoản của Google Maps; công cụ chỉ thu gom thứ
+Maps đang hiển thị cho bạn. Việc dùng lại nội dung đó là trách nhiệm của người dùng.
+
+## Cách hoạt động (cho người bảo trì)
+
+- **Một file** `index.html`: trang xem + hàm `grab()` được nhúng nguyên văn vào bookmark.
+  Sửa `grab()` thì tăng `BM_VER` để bookmark cũ nhận cảnh báo cập nhật. Trong `grab()` không dùng
+  `innerHTML`/`eval` (Maps bật Trusted Types) và chỉ dùng chú thích `/* */`.
+- **Vì sao cần bookmark**: trình duyệt chặn trang khác đọc dữ liệu Google Maps (CORS), còn bookmark chạy
+  ngay trong tab Maps nên đọc được DOM.
+- **Chỉ đọc đúng danh sách đang mở**: Maps là SPA, DOM và `performance` còn giữ ảnh của địa điểm đã xem trước
+  đó; bookmark chỉ đọc các ô `[data-photo-index]` của thư viện và các khối `[data-review-id]` đang hiển thị,
+  bỏ qua hàng tab (tab có ảnh đại diện riêng).
+- **Ảnh hay video**: ô thư viện có `aria-label="Video"`. Trang xem kiểm tra lại từng video bằng hai cách độc lập
+  (`fetch <id>=dv` có chuyển hướng sang mp4 không; thẻ `<video>` có đọc được metadata không) và chỉ chuyển
+  một mục sang cột Ảnh khi cả hai đều nói không phải video. Mạng treo thì giữ nguyên nhãn của bookmark.
+- **Kiểm thử** (cần Node, Python, Playwright và Chrome):
+
+  ```
+  node tests/core.mjs && node tests/dates.mjs
+  python3 tests/viewer.py                      # trang xem: dữ liệu giả mạo, cảnh báo bản cũ, bố cục
+  python3 tests/flow.py                        # toàn bộ luồng trên trang Maps giả lập
+  NET=slow python3 tests/flow.py               # mạng chậm
+  CLS=none PREFIX=1 DIRECT=1 python3 tests/flow.py
+  PRESS=skip python3 tests/flow.py ; PRESS=send python3 tests/flow.py
+  ```
+
+  Trang Maps giả lập trong `tests/flow.py` dựng theo cấu trúc Maps thật đã quan sát được; nó không thay
+  được việc chạy thử trên Maps thật sau mỗi lần sửa.

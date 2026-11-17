@@ -19,10 +19,13 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
-header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-h1{font-size:16px;margin:0;display:flex;align-items:center;gap:8px;white-space:nowrap}
-h1 svg{width:20px;height:20px;fill:#ea4335}
-.status{color:var(--muted);font-size:13px;margin-left:auto}
+header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;height:53px}
+h1{font-size:16px;margin:0;display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0;flex:0 1 auto;overflow:hidden}
+h1 svg{width:20px;height:20px;fill:#ea4335;flex:none}
+#place{font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;min-width:0}
+.status{color:var(--muted);font-size:13px;margin-left:auto;flex:1 1 0;min-width:0;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.warn{background:#fff4e5;color:#7a4100;border-bottom:1px solid #f3d19c;padding:8px 16px;font-size:13px}
+@media (prefers-color-scheme:dark){.warn{background:#3a2a10;color:#fdd663;border-color:#5a4416}}
 main{padding:16px;max-width:1800px;margin:0 auto}
 .input{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:12px}
 textarea{width:100%;min-height:64px;max-height:220px;resize:vertical;font:13px/1.4 ui-monospace,Consolas,monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text)}
@@ -38,7 +41,7 @@ details{grid-column:1/-1;color:var(--muted);font-size:13px}
 details ol{margin:6px 0 0;padding-left:20px}
 code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
-@media (max-width:900px){.cols{grid-template-columns:1fr}.input{grid-template-columns:1fr}.actions{flex-direction:row;flex-wrap:wrap}}
+@media (max-width:900px){.cols{grid-template-columns:1fr}.input{grid-template-columns:1fr}.actions{flex-direction:row;flex-wrap:wrap}.colhead{position:static}h1{font-size:14px}}
 .col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);min-height:200px}
 .colhead{position:sticky;top:53px;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .colhead h2{font-size:15px;margin:0}
@@ -93,9 +96,10 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
 </head>
 <body>
 <header>
-  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.2 11.4 7 12.2a.7.7 0 0 0 1 0c.8-.8 7-6.8 7-12.2A7.5 7.5 0 0 0 12 2Zm0 10.3a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>GMaps Media Viewer <span id="place" style="font-weight:400;color:var(--muted)"></span></h1>
-  <span class="status" id="status"></span>
+  <h1><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.2 11.4 7 12.2a.7.7 0 0 0 1 0c.8-.8 7-6.8 7-12.2A7.5 7.5 0 0 0 12 2Zm0 10.3a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6Z"/></svg>GMaps Media Viewer <span id="place"></span></h1>
+  <span class="status" id="status" title="Bấm để copy dòng trạng thái"></span>
 </header>
+<div class="warn" id="warn" hidden>⚠ Bookmark <b>📍 Lấy ảnh Maps</b> bạn vừa dùng là bản cũ, kết quả có thể thiếu hoặc sai. Hãy xoá bookmark đó và kéo lại nút mới ở bên dưới.</div>
 
 <main>
   <section class="input">
@@ -113,9 +117,12 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       <summary>Hướng dẫn</summary>
       <ol>
         <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
-        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (bình luận kèm ảnh), mở thư viện → tab <b>Tất cả</b> (mọi ảnh, kể cả ảnh không kèm bình luận), rồi tab <b>Video</b> (video và ngày đăng), sau đó mở trang này. Bấm <b>Gửi ngay</b> trên khung nhỏ nếu không muốn chờ cuộn hết.</li>
+        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (bình luận kèm ảnh), mở thư viện → tab <b>Tất cả</b> (mọi ảnh, kể cả ảnh không kèm bình luận), rồi tab <b>Video</b> (video và ngày đăng), sau đó mở trang này.</li>
+        <li>Trên khung nhỏ: <b>Bỏ qua bước</b> kết thúc bước đang chạy và làm tiếp bước sau (dùng khi quá nhiều bình luận); <b>Gửi ngay</b> dừng tất cả và gửi phần đã lấy, các bước chưa chạy sẽ không có dữ liệu.</li>
         <li>Cột Ảnh nhóm theo từng bình luận: bấm nội dung để mở rộng, <b>Chọn ảnh</b> để tick cả nhóm, <b>Copy bình luận</b> để chép nội dung.</li>
-        <li>Đã cập nhật bookmark? Xoá bookmark cũ và kéo lại nút mới.</li>
+        <li>Dùng Chrome hoặc Edge trên máy tính. Nếu trang kết quả không tự mở (trình duyệt chặn cửa sổ bật lên), bấm <b>Mở kết quả</b> trên khung nhỏ.</li>
+        <li>Trang báo bookmark là bản cũ? Xoá bookmark đó và kéo lại nút mới.</li>
+        <li>Kết quả thiếu hoặc sai? Bấm vào dòng trạng thái ở góc phải trên cùng để copy và gửi cho người phụ trách.</li>
         <li>Chỉ dán link địa điểm thì chỉ lấy được ảnh có sẵn trong link (thường là ảnh bìa), vì Google không cho trang web khác đọc danh sách ảnh.</li>
         <li>Ảnh copy ra dạng <code>=s0</code> (gốc), video dạng <code>=dv</code> (mp4 gốc). Tick nhiều ô rồi <b>Copy đã chọn</b> → các link cách nhau dấu phẩy.</li>
       </ol>
@@ -163,7 +170,7 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
 
 <script>
 'use strict';
-/* ==== CORE (pure, tested by test.mjs) ==== */
+/* ==== CORE (pure functions, unit-tested) ==== */
 const HOST = 'https://lh3.googleusercontent.com/';
 // Paths that are UI/avatars, not place media.
 const SKIP = /^(a|a-|ogw)\//;
@@ -212,7 +219,7 @@ function toDate15(raw, now = new Date()) {
 /* ==== END CORE ==== */
 
 const $ = s => document.querySelector(s);
-const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', sel:false}
+const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', r: review index|-1, sel, date, dateRaw, checking}
 const STORE = 'gmv.items.v1', RSTORE = 'gmv.reviews.v1';
 let reviews = [];                  // [{a: author, s: stars, t: text, m: hidden extra photos}]
 const cols = {};
@@ -238,37 +245,46 @@ async function copyText(s, label) {
 }
 function save() {
   try {
-    localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw, r }) => [p, kind, date || '', dateRaw || '', r ?? -1])));
+    localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw, r, checking }) => [p, kind, date || '', dateRaw || '', r ?? -1, checking ? 1 : 0])));
     localStorage.setItem(RSTORE, JSON.stringify(reviews));
+    localStorage.setItem('gmv.diag', diag);
   } catch {}
 }
 function load() {
-  try { reviews = JSON.parse(localStorage.getItem(RSTORE)) || []; } catch {}
-  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw, r]) => items.set(p, { p, kind, date, dateRaw, r: r ?? -1, sel: false })); } catch {}
+  try { reviews = JSON.parse(localStorage.getItem(RSTORE)) || []; diag = localStorage.getItem('gmv.diag') || ''; } catch {}
+  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw, r, c]) => items.set(p, { p, kind, date, dateRaw, r: r ?? -1, checking: !!c, sel: false })); } catch {}
 }
 const shortId = p => p.slice(-14);
 const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
 
 /* ---------- classify: photo vs video ----------
-   lh3 id + "=dv" -> 302 to the original mp4 for videos; photos return 500 (no CORS -> fetch throws).
-   With redirect:'manual' a redirect shows up as an opaqueredirect response. */
-const queue = []; let running = 0; const LIMIT = 10;
+   Two independent checks, because neither could be tried against every Google response shape:
+   1) fetch <id>=dv with redirect:'manual': a video answers with a redirect to the mp4 (opaqueredirect);
+   2) otherwise ask a <video> element to read the metadata (works for a direct 200 too; a photo gives 500).
+   A video the bookmark labelled (it.checking) is moved to photos only when BOTH say it is not a video;
+   a timeout (slow network) keeps the label. */
+const queue = []; let running = 0; const LIMIT = 6;
 function classify(it) { queue.push(it); pump(); }
-const probe = p => fetch(videoUrl(p), { redirect: 'manual', referrerPolicy: 'no-referrer', cache: 'no-store' })
-  .then(r => r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400) ? 'video' : 'photo', () => 'error');
-async function check(p) {   // a network hiccup must not turn a real video into a photo: retry errors
-  let k = await probe(p);
-  for (let i = 0; k === 'error' && i < 2; i++) { await new Promise(r => setTimeout(r, 800)); k = await probe(p); }
-  return k === 'video' ? 'video' : 'photo';
-}
+const probe = p => fetch(videoUrl(p), { redirect: 'manual', referrerPolicy: 'no-referrer', cache: 'no-store', signal: AbortSignal.timeout(10000) })
+  .then(r => r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400), () => false);
+const plays = p => new Promise(res => {
+  const v = document.createElement('video'); let done = false;
+  const end = k => { if (done) return; done = true; clearTimeout(t); v.removeAttribute('src'); try { v.load(); } catch {} res(k); };
+  const t = setTimeout(() => end('unknown'), 12000);
+  v.preload = 'metadata'; v.muted = true;
+  v.onloadedmetadata = () => end('video'); v.onerror = () => end('photo');
+  v.src = videoUrl(p);
+});
+const check = async p => (await probe(p)) ? 'video' : plays(p);
 let fixedN = 0;
 function pump() {
   while (running < LIMIT && queue.length) {
     const it = queue.shift(); running++;
     check(it.p)
       .then(kind => {
-        if (!items.has(it.p)) return;
-        if (it.checking && kind !== 'video') { fixedN++; it.date = it.dateRaw = ''; }
+        if (items.get(it.p) !== it) return;   // list was replaced meanwhile
+        if (kind === 'unknown') kind = it.checking ? 'video' : 'photo';
+        if (it.checking && kind === 'photo') { fixedN++; it.date = it.dateRaw = ''; }
         it.checking = false;
         const moved = kind !== kindOf(it);
         it.kind = kind;
@@ -285,8 +301,9 @@ function pump() {
 let diag = '';
 function status() {
   const pending = [...items.values()].filter(i => i.kind === 'pending' || i.checking).length;
-  $('#status').textContent = pending ? `Đang kiểm tra ảnh/video… còn ${pending}` : (items.size ? `${items.size} mục` : '') + (diag ? ' · ' + diag : '');
+  $('#status').textContent = [pending ? `Đang kiểm tra ảnh/video… còn ${pending}` : '', items.size ? `${items.size} mục` : '', diag].filter(Boolean).join(' · ');
 }
+$('#status').onclick = () => { const t = $('#status').textContent; if (t) copyText(($('#place').textContent + ' ' + t).trim(), 'Đã copy dòng trạng thái'); };
 
 /* ---------- render ---------- */
 function cardHTML(it) {
@@ -399,7 +416,7 @@ function addFrom(text) {
 $('#add').onclick = () => { if (addFrom($('#src').value)) $('#src').value = ''; };
 $('#src').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#add').click(); });
 $('#src').addEventListener('paste', () => setTimeout(() => { if (extractPaths($('#src').value).length) $('#add').click(); }, 0));
-$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); reviews = []; diag = ''; setPlace(''); save(); render(); } };
+$('#clear').onclick = () => { if (items.size && confirm('Xoá toàn bộ ' + items.size + ' mục?')) { items.clear(); reviews = []; diag = ''; setPlace(''); $('#warn').hidden = true; save(); render(); } };
 
 /* ---------- lightbox ---------- */
 let cur = null;
@@ -448,16 +465,23 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- bookmarklet ----------
-   grab() runs on the user's own Google Maps tab (their IP + session, so Google doesn't block it).
-   It opens the photo gallery, scrolls it to the end, scans the "Video" tab so the viewer knows which
-   ids are videos without probing, then hands everything to this page via the URL hash.
-   Each run REPLACES the viewer's list (new=1).
-   Rules: no innerHTML/eval (Maps enforces Trusted Types), only block comments (code is serialized). */
-function grab(APP) {
+   grab() runs on the user's own Google Maps tab (their IP + session, so Google doesn't block it):
+   1) "Bài đánh giá" tab: each review with its text and photos;
+   2) gallery "Tất cả" tab: every photo (also those without a review); tiles labelled "Video" are videos;
+   3) gallery "Video" tab: remaining videos + upload dates;
+   then it hands everything to this page in the URL hash (#z=…, see "boot").
+   Rules: no innerHTML/eval (Maps enforces Trusted Types), only block comments (the code is serialized
+   into the bookmark). Bump BM_VER on every change to grab(), so old bookmarks get the "update" banner. */
+const BM_VER = 9;
+function grab(APP, VER) {
   if (window.__gmvRun) return; window.__gmvRun = 1;
+  const placeAtStart = ((document.querySelector('[role="main"] h1') || {}).textContent || '').trim();
   const RE = /lh[3-6]\.(?:googleusercontent|ggpht)\.com(?:\/|%2F)([^\s"'<>()\\,!?#&;]+)/gi;
   const ALL = new Set(), VID = new Set();
-  let stop = 0, abort = 0;
+  /* stop = "Gửi ngay" (send what we have), skip = "Bỏ qua bước" (end the current step only), abort = "Huỷ". */
+  let stop = 0, skip = 0, abort = 0, phase = '';
+  const dg = [];
+  const halt = () => stop || skip || abort;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const add = (s, set) => {
     if (!s || s.indexOf('lh') < 0) return;
@@ -478,21 +502,27 @@ function grab(APP) {
   };
   /* --- overlay (createElement only: Trusted Types) --- */
   const el = (tag, css, txt) => { const e = document.createElement(tag); e.style.cssText = css; if (txt) e.textContent = txt; return e; };
-  const box = el('div', 'position:fixed;top:12px;right:12px;z-index:2147483647;width:270px;background:#202124;color:#e8eaed;font:13px/1.45 system-ui,sans-serif;padding:12px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4)');
+  const box = el('div', 'position:fixed;top:12px;right:12px;z-index:2147483647;width:310px;background:#202124;color:#e8eaed;font:13px/1.45 system-ui,sans-serif;padding:12px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4)');
   const msg = el('div', 'font-weight:600', '📍 Đang mở mục ảnh…');
   const cnt = el('div', 'color:#9aa0a6;margin:4px 0 10px', '');
   const row = el('div', 'display:flex;gap:6px');
   const bcss = 'flex:1;border:0;border-radius:6px;padding:6px 8px;font:inherit;cursor:pointer;';
   const go = el('button', bcss + 'background:#8ab4f8;color:#0b1220;font-weight:600', 'Gửi ngay');
   const no = el('button', bcss + 'background:#3c4043;color:#e8eaed', 'Huỷ');
-  go.onclick = () => { stop = 1; };
+  const sk = el('button', bcss + 'background:#3c4043;color:#e8eaed', 'Bỏ qua bước');
+  sk.title = 'Kết thúc bước đang chạy và làm tiếp bước sau';
+  go.title = 'Dừng tất cả và gửi những gì đã lấy được';
+  sk.onclick = () => { skip = 1; dg.push('Đã bấm Bỏ qua ở bước ' + phase); };
+  go.onclick = () => { stop = 1; dg.push('Đã bấm Gửi ngay ở bước ' + phase); };
   no.onclick = () => { stop = abort = 1; box.remove(); window.__gmvRun = 0; };
-  row.append(go, no); box.append(msg, cnt, row); document.body.appendChild(box);
+  const begin = (name, text) => { phase = name; skip = 0; msg.textContent = '📍 ' + text; };
+  row.append(sk, go, no); box.append(msg, cnt, row); document.body.appendChild(box);
   const show = () => { const u = new Set(ALL); if (typeof REV !== 'undefined') REV.forEach(v => v.p.forEach(p => u.add(p))); VID.forEach(p => u.delete(p)); cnt.textContent = `Ảnh: ${u.size} · Video: ${VID.size}`; };
   /* --- page helpers --- */
   const main = () => document.querySelector('[role="main"]') || document.body;
   const vis = e => e && e.getClientRects().length > 0;
-  const tiles = () => document.querySelectorAll('[data-photo-index]');
+  /* Gallery tiles only: photo buttons inside a review may carry data-photo-index too. */
+  const tiles = () => document.querySelectorAll('[data-photo-index]:not([data-review-id])');
   const seeds = () => { const t = [...tiles()]; return t.length ? t : [...main().querySelectorAll('[style*="googleusercontent"],img[src*="googleusercontent"]')]; };
   /* Test aria-label, visible text and title separately: a tab may be "Video (12)", icon + text, etc. */
   const labels = b => [b.getAttribute('aria-label'), b.textContent, b.title].map(x => (x || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
@@ -506,8 +536,8 @@ function grab(APP) {
     if (!tab || tab.getAttribute('aria-selected') === 'true') return;
     const old = tiles()[0];
     tab.click();
-    if (tab.hasAttribute('aria-selected')) await waitFor(() => tab.getAttribute('aria-selected') === 'true', 5000);
-    await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 5000);
+    if (tab.hasAttribute('aria-selected')) await waitFor(() => tab.getAttribute('aria-selected') === 'true', 15000);
+    await waitFor(() => !old || !old.isConnected || tiles()[0] !== old, 8000);
     await sleep(800);
   }
   const waitFor = async (fn, ms) => { const end = Date.now() + ms; while (Date.now() < end && !abort) { const r = fn(); if (r) return r; await sleep(200); } return null; };
@@ -520,13 +550,13 @@ function grab(APP) {
     return null;
   };
   /* Scroll step by step (lazy tiles only get their image when on screen); stop when the end
-     stays the same for ~2.5s, so slow networks still get time to load the next batch. */
-  /* Only the open place's gallery tiles: Maps is an SPA, so the rest of the page (and the
-     performance entries) still hold photos of places visited earlier. */
-  /* strict (Video tab): never fall back to the whole panel, only the gallery list. */
+     stays the same for ~4s, so slow networks still get time to load the next batch.
+     Only the open place's gallery tiles are read: Maps is an SPA, so the rest of the page (and the
+     performance entries) still hold photos of places visited earlier.
+     strict (Video tab): never fall back to the whole panel, only the gallery list. */
   let galSc = null;
   const gal = () => (galSc && galSc.isConnected ? galSc : (galSc = scroller()));
-  const isVideoTile = e => /^\s*video/i.test(e.getAttribute('aria-label') || '');
+  const isVideoTile = e => /^\s*vid[eé]o/i.test(e.getAttribute('aria-label') || '');
   const scanTiles = (set, sc, strict) => {
     const t = [...tiles()];
     /* Video tiles carry aria-label="Video" (seen on real Maps), so "Tất cả" already tells them apart.
@@ -539,21 +569,43 @@ function grab(APP) {
         if (strict) { if (v || !labelled) scan(e, set); } else scan(e, v ? VID : set);
       });
     }
-    else if (sc) scan(sc, set); else if (!strict) scan(main(), set);
+    else if (sc) scan(sc, set);
   };
-  async function scrollAll(set, strict) {
-    let sc = gal(), idle = 0, lastH = -1, lastN = -1;
+  /* Scroll a lazy list to its end. Waits adapt to the network:
+     - nothing rendered yet (count() = 0, e.g. right after a tab switch): wait up to 20s for the first items;
+     - at the end of the list: at least 8s, or 3x the longest time an earlier batch took (max 30s). */
+  async function scrollList(getSc, tick, sizeOf, count, capMs) {
+    let sc = null, lastH = -1, lastN = -1, endAt = 0, maxLat = 0;
     const t0 = Date.now();
-    while (!stop && Date.now() - t0 < 180000) {
-      scanTiles(set, sc, strict); show();
-      if (!sc) break;
-      const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
-      if (end && sc.scrollHeight === lastH && set.size === lastN) { if (++idle >= 8) break; } else idle = 0;   /* ~4s at the end for slow networks */
-      lastH = sc.scrollHeight; lastN = set.size;
-      sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
+    while (!halt() && Date.now() - t0 < capMs) {
+      if (!sc || !sc.isConnected) sc = getSc();
+      tick(sc);
+      const h = sc ? sc.scrollHeight : 0, n = sizeOf() + count();
+      const grew = h !== lastH || n !== lastN;
+      const end = !sc || sc.scrollTop + sc.clientHeight >= h - 4;   /* no scroller = list fits or is not there yet */
+      if (!end || grew) { if (grew && endAt) maxLat = Math.max(maxLat, Date.now() - endAt); endAt = 0; }
+      else if (!endAt) endAt = Date.now();
+      else if (Date.now() - endAt > (count() ? Math.min(30000, Math.max(8000, maxLat * 3)) : 20000)) break;
+      if (endAt && Date.now() - endAt > 1500) cnt.textContent += ' · chờ Maps nạp thêm…';
+      lastH = h; lastN = n;
+      if (sc) sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
       await sleep(500);
-      if (!sc.isConnected) sc = gal();
     }
+    if (Date.now() - t0 >= capMs) dg.push('Hết thời gian ở bước ' + phase);
+  }
+  /* A tile whose thumbnail URL never arrived (scrolled past too fast on a slow network): go back to it. */
+  const hasUrl = t => /url\(/.test(t.getAttribute('style') || '') || !!t.querySelector('[style*="url("],img[src]');
+  async function scrollAll(set, strict) {
+    /* strict: old photo tiles may still be on screen while the Video tab loads, so count video tiles only */
+    const count = () => { const t = [...tiles()]; return strict && t.some(e => e.hasAttribute('aria-label')) ? t.filter(isVideoTile).length : t.length; };
+    await scrollList(gal, sc => { scanTiles(set, sc, strict); show(); }, () => set.size + VID.size, count, 900000);
+    for (const t of [...tiles()].filter(x => !hasUrl(x)).slice(0, 300)) {
+      if (halt()) break;
+      t.scrollIntoView({ block: 'center' });
+      await waitFor(() => hasUrl(t), 4000);
+    }
+    scanTiles(set, gal(), strict); show();
+    return [...tiles()].filter(x => !hasUrl(x)).length;
   }
   /* Upload date: Maps only shows it for the OPEN item, so click each video tile and take the
      date-like text that appears/changes (diff against before the click). */
@@ -581,7 +633,7 @@ function grab(APP) {
     const done = new Set(), sc = gal();
     let last = '', guard = 0;
     if (sc) { sc.scrollTop = 0; await sleep(500); }
-    while (!stop && done.size < VID.size && guard++ < VID.size * 4 + 10) {
+    while (!halt() && done.size < VID.size && guard++ < VID.size * 4 + 10) {
       const t = vtiles().find(x => { const id = idOf(x); return id && VID.has(id) && !done.has(id); });
       if (!t) {
         if (!sc) break;
@@ -604,16 +656,24 @@ function grab(APP) {
   }
   const VRE = /^\s*videos?(\s|\(|·|,|:|\d|$)/i, ARE = /^(tất cả|all)(\s|$)/i;
   const galTab = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re));
-  const inGallery = () => galTab(VRE) || galTab(ARE);
+  const inGallery = () => !!(galTab(VRE) || galTab(ARE));
+  const placeTab = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re));
+  const OVRE = /^(tổng quan|overview)(\s|$)/i;
+  /* Gallery is open when its tabs show, or (a gallery without tabs) tiles show and the place tabs are gone. */
+  const galleryOpen = () => inGallery() || (tiles().length > 0 && !placeTab(OVRE));
+  const hero = () => document.querySelector('button[jsaction*="heroHeaderImage"]');
   async function openGallery() {
-    if (inGallery()) return;
-    const hero = document.querySelector('button[jsaction*="heroHeaderImage"]')
-      || byText(/^(ảnh|photos?|xem ảnh|see photos)(\s|$)/i)
+    if (galleryOpen()) return;
+    /* Fallbacks never touch a review: its photo buttons are labelled "Ảnh …" too and open another viewer. */
+    const free = e => e && !e.closest('[data-review-id]');
+    const h = hero()
+      || [...document.querySelectorAll('button,[role="button"]')].find(b => free(b) && hit(b, /^(ảnh|photos?|xem ảnh|see photos|xem tất cả ảnh|all photos)(\s|$)/i))
       || [...main().querySelectorAll('img[src*="googleusercontent"],[style*="googleusercontent"]')]
+           .filter(e => free(e) && !/googleusercontent\.com\/(a|a-|ogw)\//.test((e.getAttribute('src') || '') + (e.getAttribute('style') || '')))   /* not an avatar */
            .map(e => e.closest('button,a,[jsaction]')).find(Boolean);
-    if (!hero) return;
-    hero.click();
-    await waitFor(() => inGallery() || tiles().length, 8000);
+    if (!h) return;
+    h.click();
+    await waitFor(galleryOpen, 20000);
     await sleep(600);
   }
   /* --- Reviews tab: each [data-review-id] block -> author, stars, full text, its photos --- */
@@ -623,7 +683,7 @@ function grab(APP) {
     const m = new Map();
     for (const e of document.querySelectorAll('[data-review-id]')) {
       const id = e.getAttribute('data-review-id');
-      if (m.has(id)) continue;
+      if (m.has(id) || !vis(e)) continue;   /* hidden = leftover panel of a place visited earlier */
       let up = e.parentElement, nested = false;
       for (; up; up = up.parentElement) if (up.getAttribute && up.getAttribute('data-review-id') === id) { nested = true; break; }
       if (!nested) m.set(id, e);
@@ -631,23 +691,31 @@ function grab(APP) {
     return m;
   };
   const OWNER = '.CDe7pd';
-  const revText = r => {
+  const revText = (r, hasCls) => {
     const w = [...r.querySelectorAll('.wiI7pd')].find(e => !e.closest(OWNER));
     if (w) return w.textContent.replace(/\s+/g, ' ').trim();
+    if (hasCls) return '';   /* this Maps build marks review text with .wiI7pd: none here = photos without text */
+    const who = revAuthor(r);
     let best = '';
     for (const e of r.querySelectorAll('span,div')) {
       if (e.childElementCount || e.closest('button,' + OWNER)) continue;
       const t = e.textContent.replace(/\s+/g, ' ').trim();
-      if (t.length > best.length && !DRE.test(t)) best = t;
+      if (t.length > best.length && t !== who && !DRE.test(t)) best = t;
     }
     return best;
   };
   const revAuthor = r => (r.getAttribute('aria-label') || (r.querySelector('.d4r55') || {}).textContent || '').trim();
   const revStars = r => { for (const e of r.querySelectorAll('[aria-label]')) { const m = e.getAttribute('aria-label').match(/^\s*(\d)(?:[.,]\d)?\s*(?:sao|stars?)/i); if (m) return +m[1]; } return 0; };
   const revMore = r => { for (const e of r.querySelectorAll('*')) if (e.childElementCount === 0) { const m = (e.textContent || '').trim().match(/^\+(\d+)$/); if (m) return +m[1]; } return 0; };
-  function readReviews() {
+  function readReviews(full) {
     const m = outerReviews(); revSeen = Math.max(revSeen, m.size);
+    const hasCls = !!document.querySelector('[data-review-id] .wiI7pd');
+    let i = 0;
     for (const [id, r] of m) {
+      /* Reviews far above were already read several times: only re-read the tail, so long lists stay fast. */
+      const idx = i++;
+      if (!full && (r.__gmvN || 0) >= 6 && idx < m.size - 40) continue;
+      r.__gmvN = (r.__gmvN || 0) + 1;
       if (!r.__gmvOpen) {   /* expand "Thêm"/"More" once so the full text is in the DOM */
         r.__gmvOpen = 1;
         for (const b of r.querySelectorAll('button,[role="button"]'))
@@ -657,7 +725,7 @@ function grab(APP) {
       if (!ps.size) continue;
       const cur = REV.get(id) || { a: '', s: 0, t: '', p: new Set(), more: 0 };
       ps.forEach(p => cur.p.add(p));
-      const t = revText(r); if (t.length > cur.t.length) cur.t = t;
+      const t = revText(r, hasCls); if (t.length > cur.t.length) cur.t = t;
       cur.a = cur.a || revAuthor(r); cur.s = cur.s || revStars(r); cur.more = Math.max(cur.more, revMore(r));
       REV.set(id, cur);
     }
@@ -673,19 +741,8 @@ function grab(APP) {
     return null;
   };
   async function scrollReviews() {
-    let sc = null, idle = 0, lastH = -1, lastN = -1;
-    const t0 = Date.now();
-    while (!stop && Date.now() - t0 < 900000) {
-      readReviews();
-      if (!sc || !sc.isConnected) sc = revScroller();
-      if (!sc) break;
-      const end = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 4;
-      if (end && sc.scrollHeight === lastH && revSeen === lastN) { if (++idle >= 8) break; } else idle = 0;
-      lastH = sc.scrollHeight; lastN = revSeen;
-      sc.scrollBy(0, Math.max(200, sc.clientHeight * 0.85));
-      await sleep(500);
-    }
-    await sleep(300); readReviews();   /* pick up text expanded by the last "Thêm" clicks */
+    await scrollList(revScroller, () => readReviews(), () => revSeen, () => revSeen, 1800000);
+    await sleep(300); readReviews(true);   /* pick up text expanded by the last "Thêm" clicks */
   }
   const pack = async obj => {
     const s = new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
@@ -700,48 +757,64 @@ function grab(APP) {
     }
   })();
   async function run() {
-    const dg = [];
     /* 1) Review text + the photos of each review ("Bài đánh giá" tab) */
-    const rtab = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(bài đánh giá|reviews?)(\s|$)/i));
+    const rtab = placeTab(/^(bài đánh giá|reviews?)(\s|$)/i);
     if (rtab) {
-      msg.textContent = '📍 Đang mở tab Bài đánh giá…';
+      begin('Bài đánh giá', 'Đang mở tab Bài đánh giá…');
       if (rtab.getAttribute('aria-selected') !== 'true') rtab.click();
-      await waitFor(() => document.querySelector('[data-review-id]'), 8000);
+      await waitFor(() => halt() || outerReviews().size, 20000);
       await sleep(800);
-      msg.textContent = '📍 Đang duyệt bình luận…';
+      if (!halt()) msg.textContent = '📍 Đang duyệt bình luận…';
       await scrollReviews();
       dg.push(`Bình luận: duyệt ${revSeen}, có ảnh ${REV.size}`);
-    } else dg.push('Không thấy tab Bài đánh giá');
+    } else dg.push('Không thấy tab Bài đánh giá' + (inGallery() ? ' (đang ở thư viện ảnh)' : ''));
     if (abort) return;
-    /* 2) Every photo (also those posted without a review) from the gallery's "Tất cả" tab.
-          Go back to "Tổng quan" first so the cover photo (gallery entry) is the one clicked. */
+    /* 2) Every photo (also those posted without a review) from the gallery's "Tất cả" tab */
     if (!stop) {
-      msg.textContent = '📍 Đang mở thư viện ảnh…';
-      const ov = [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, /^(tổng quan|overview)(\s|$)/i));
-      if (ov && !inGallery()) { ov.click(); await waitFor(() => document.querySelector('button[jsaction*="heroHeaderImage"]'), 4000); await sleep(600); }
-      await openGallery();
-      if (!inGallery()) dg.push('Không mở được thư viện ảnh. Các tab: ' + (tabNames() || '(không có)'));
-      const at = galTab(ARE);
-      if (at) { await switchTab(at); msg.textContent = '📍 Đang cuộn tab Tất cả…'; await scrollAll(ALL); dg.push(`Tất cả: ${ALL.size} ảnh, ${VID.size} video`); }
-      /* Last resort (no reviews, no gallery): whatever media the open panel shows. */
-      else if (!REV.size) { scan(main(), ALL); dg.push(`Quét trang: ${ALL.size}`); }
+      begin('Mở thư viện ảnh', 'Đang mở thư viện ảnh…');
+      for (let i = 0; i < 3 && !galleryOpen() && !halt(); i++) {
+        const ov = placeTab(OVRE);
+        if (ov) {   /* back to "Tổng quan", where the cover photo (gallery entry) is; do not trust aria-selected */
+          if (!hero() || i) ov.click();
+          await waitFor(() => halt() || hero(), 15000);
+          await sleep(500);
+        } else if (i) break;
+        await openGallery();
+      }
+      if (galleryOpen()) {
+        const at = galTab(ARE);
+        if (at) await switchTab(at);
+        begin('Tất cả', 'Đang cuộn tab Tất cả…');
+        const left = await scrollAll(ALL);
+        dg.push(`Tất cả: ${ALL.size} ảnh, ${VID.size} video` + (left ? `, ${left} ô chưa nạp` : ''));
+      } else if (!stop) {
+        dg.push('Không mở được thư viện ảnh. Các tab: ' + (tabNames() || '(không có)'));
+        /* Last resort (no reviews, no gallery): whatever media the open panel shows. */
+        if (!REV.size) { scan(main(), ALL); dg.push(`Quét trang: ${ALL.size}`); }
+      }
     }
     if (abort) return;
     /* 3) Video tab: any video still missing + upload dates */
     const vtab = !stop && galTab(VRE);
     if (vtab) {
-      msg.textContent = '📍 Đang quét tab Video…';
+      begin('Video', 'Đang quét tab Video…');
       await switchTab(vtab);
       await scrollAll(VID, true);
       dg.push(`Video: ${VID.size}`);
-      if (VID.size) await readDates();
-    } else if (!stop) dg.push('Không thấy tab Video');
+      if (VID.size && !halt()) { phase = 'Ngày đăng video'; await readDates(); }
+    } else if (!stop && galleryOpen()) dg.push('Thư viện không có tab Video');
     if (abort) return;
     const reviews = [...REV.values()].map(v => ({ a: v.a, s: v.s, t: v.t, p: [...v.p], m: v.more }));
     if (!reviews.length && !VID.size && !ALL.size) { msg.textContent = 'Không thấy ảnh/video nào. ' + dg.join(' · '); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
+    const inRev = new Set(); REV.forEach(v => v.p.forEach(p => inRev.add(p)));
+    if (inRev.size && ALL.size) { let n = 0; inRev.forEach(p => { if (ALL.has(p) || VID.has(p)) n++; }); dg.push(`Ảnh bình luận có trong thư viện: ${n}/${inRev.size}`); }
     const h1 = document.querySelector('[role="main"] h1, h1');
-    const z = await pack({ n: h1 ? h1.textContent.trim() : '', dg: dg.join(' · '), r: reviews, x: [...ALL], v: [...VID].map(p => [p, DATES[p] || '']) });
-    const url = APP + '#z=' + z;
+    const data = { bv: VER, n: placeAtStart || (h1 ? h1.textContent.trim() : '') || document.title.replace(/\s*[-–]\s*Google Maps\s*$/i, ''), dg: dg.join(' · '),
+      r: reviews, x: [...ALL].filter(p => !inRev.has(p)), v: [...VID].map(p => [p, DATES[p] || '']) };
+    /* Chrome refuses URLs over 2 MB: drop the review text first, then give up with a clear message. */
+    let url = APP + '#z=' + await pack(data);
+    if (url.length > 1900000) { data.r.forEach(r => { r.t = ''; }); data.dg += ' · Dữ liệu quá lớn: đã bỏ nội dung bình luận'; url = APP + '#z=' + await pack(data); }
+    if (url.length > 1900000) { msg.textContent = 'Địa điểm quá nhiều ảnh để gửi một lần. Hãy chạy lại và bấm "Gửi ngay" sớm hơn.'; go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
     window.__gmvRun = 0;
     const w = window.open(url, 'gmv-viewer');
     if (w) { msg.textContent = '✓ Đã gửi sang GMaps Media Viewer'; row.remove(); setTimeout(() => box.remove(), 2500); return; }
@@ -752,44 +825,63 @@ function grab(APP) {
   }
 }
 const APP = location.origin + location.pathname;
-const BM_SRC = `(${grab})(${JSON.stringify(APP)})`;
+const BM_SRC = `(${grab})(${JSON.stringify(APP)},${BM_VER})`;
 $('#bm').href = 'javascript:' + encodeURIComponent(BM_SRC);
 $('#bm').onclick = e => { e.preventDefault(); toast('Kéo nút này lên thanh dấu trang, rồi bấm nó khi đang mở địa điểm trên Google Maps'); };
 $('#bmcopy').onclick = () => copyText('javascript:' + encodeURIComponent(BM_SRC), 'Đã copy code — tạo bookmark mới và dán vào ô URL');
 
 /* ---------- boot ---------- */
-// Data from the bookmarklet: replaces the current list (a new place), and when the Video tab was
-// scanned (vt=1) every kind is already known, so nothing needs probing.
-// Bookmark payload v2 (#z=…): deflate-raw + base64url JSON
-//   {n: place, dg: diagnostics, r: [{a, s, t, p:[ids], m}], x: [photo ids w/o review], v: [[id, dateText]]}
+// Bookmark payload (#z=…): deflate-raw + base64url JSON
+//   {bv: bookmark version, n: place, dg: diagnostics, r: [{a, s, t, p:[ids], m}],
+//    x: [photo ids not in any review], v: [[video id, dateText]]}
+// Each payload REPLACES the current list (a new place).
 async function unpack(z) {
   const b = atob(z.replace(/-/g, '+').replace(/_/g, '/'));
   const u = Uint8Array.from(b, c => c.charCodeAt(0));
   const st = new Blob([u]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
   return JSON.parse(await new Response(st).text());
 }
+// The payload comes from a URL, so anyone can craft one: accept only well-formed ids and plain strings.
+const OKP = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/;
+function parsePayload(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('sai định dạng');
+  const ok = p => typeof p === 'string' && p.length >= 20 && p.length < 600 && OKP.test(p) && !SKIP.test(p);
+  const str = (x, n) => typeof x === 'string' ? x.slice(0, n) : '';
+  const int = (x, max) => Math.min(max, Math.max(0, Math.floor(+x) || 0));
+  const arr = x => Array.isArray(x) ? x : [];
+  return {
+    bv: int(d.bv, 1e6), n: str(d.n, 200), dg: str(d.dg, 600),
+    r: arr(d.r).filter(r => r && typeof r === 'object').map(r => ({ a: str(r.a, 200), s: int(r.s, 5), t: str(r.t, 20000), m: int(r.m, 999), p: arr(r.p).filter(ok) })),
+    x: arr(d.x).filter(ok),
+    v: arr(d.v).filter(e => Array.isArray(e) && ok(e[0])).map(e => [e[0], str(e[1], 80)]),
+  };
+}
+const tok = p => p.slice(p.lastIndexOf('/') + 1);   // same media can appear under two lh3 prefixes
 async function ingest(hash) {
   const q = new URLSearchParams(hash.replace(/^#/, ''));
   if (!q.has('z') && !q.has('p') && !q.has('v')) return false;
   history.replaceState(null, '', location.pathname);
   if (q.has('z')) {
-    let d; try { d = await unpack(q.get('z')); } catch (e) { toast('Dữ liệu từ bookmark bị hỏng: ' + e.message); return true; }
-    items.clear(); reviews = (d.r || []).map(({ a, s, t, m }) => ({ a, s, t, m }));
-    setPlace(d.n || ''); diag = d.dg || '';
-    const vids = new Map((d.v || []).map(([p, raw]) => [p, raw]));
-    const revOf = new Map(); (d.r || []).forEach((r, i) => r.p.forEach(p => revOf.has(p) || revOf.set(p, i)));
-    (d.r || []).forEach((r, i) => r.p.forEach(p => { if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: i, sel: false }); }));
-    for (const p of d.x || []) if (!vids.has(p) && !items.has(p)) items.set(p, { p, kind: 'photo', r: -1, sel: false });
-    for (const [p, raw] of vids) {
-      const it = { p, kind: 'video', r: revOf.has(p) ? revOf.get(p) : -1, sel: false, dateRaw: raw, date: toDate15(raw), checking: true };
-      items.set(p, it); classify(it);   // safety net: =dv must redirect, or it is a photo
+    let d; try { d = parsePayload(await unpack(q.get('z'))); } catch (e) { toast('Dữ liệu từ bookmark bị hỏng: ' + e.message); return true; }
+    items.clear(); reviews = d.r.map(({ a, s, t, m }) => ({ a, s, t, m }));
+    setPlace(d.n); diag = d.dg; $('#warn').hidden = d.bv === BM_VER;
+    const vids = new Map(d.v.map(([p, raw]) => [tok(p), [p, raw]]));
+    const revOf = new Map(); d.r.forEach((r, i) => r.p.forEach(p => revOf.has(tok(p)) || revOf.set(tok(p), i)));
+    const seen = new Set();
+    const addPhoto = (p, r) => { const k = tok(p); if (vids.has(k) || seen.has(k)) return; seen.add(k); items.set(p, { p, kind: 'photo', r, sel: false }); };
+    d.r.forEach((r, i) => r.p.forEach(p => addPhoto(p, i)));
+    d.x.forEach(p => addPhoto(p, -1));
+    for (const [k, [p, raw]] of vids) {
+      const it = { p, kind: 'video', r: revOf.has(k) ? revOf.get(k) : -1, sel: false, dateRaw: raw, date: toDate15(raw), checking: true };
+      items.set(p, it); classify(it);   // safety net: see "classify"
     }
-  } else {   // legacy links (#p=…&v=…)
-    if (q.get('new') === '1') { items.clear(); reviews = []; setPlace(q.get('n') || ''); }
-    diag = q.get('dg') || '';
+  } else {   // links from the first bookmark versions (#p=…&v=…)
+    if (q.get('new') === '1') { items.clear(); reviews = []; setPlace((q.get('n') || '').slice(0, 200)); }
+    diag = (q.get('dg') || '').slice(0, 600); $('#warn').hidden = false;
     const known = q.get('vt') === '1';
-    let raw = {}; try { raw = JSON.parse(q.get('vd') || '{}'); } catch {}
-    for (const p of extractPaths(q.get('v') || '')) items.set(p, { p, kind: 'video', r: -1, sel: false, dateRaw: raw[p] || '', date: toDate15(raw[p]) });
+    let raw = {}; try { raw = JSON.parse(q.get('vd') || '{}') || {}; } catch {}
+    const dateOf = p => typeof raw[p] === 'string' ? raw[p].slice(0, 80) : '';
+    for (const p of extractPaths(q.get('v') || '')) { const it = { p, kind: 'video', r: -1, sel: false, dateRaw: dateOf(p), date: toDate15(dateOf(p)), checking: true }; items.set(p, it); classify(it); }
     for (const p of extractPaths(q.get('p') || '')) if (!items.has(p)) {
       const it = { p, kind: known ? 'photo' : 'pending', r: -1, sel: false }; items.set(p, it);
       if (!known) classify(it);
@@ -805,7 +897,8 @@ function setPlace(n) {
 }
 try { setPlace(localStorage.getItem('gmv.place') || ''); } catch {}
 load();
-for (const it of items.values()) if (it.kind === 'pending') classify(it);
+for (const it of items.values()) if (it.kind === 'pending' || it.checking) classify(it);   // resume after a reload
+if (!items.size) document.querySelector('details').open = true;   // first visit: show the guide
 render();
 ingest(location.hash);
 window.addEventListener('hashchange', () => ingest(location.hash));   // reused 'gmv-viewer' tab
