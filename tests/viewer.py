@@ -1,18 +1,22 @@
 """Viewer-only checks: crafted payloads, old-bookmark banner, persistence, layout."""
-import base64, re, asyncio, json, os
+import base64, re, asyncio, json, os, struct, zlib
 from playwright.async_api import async_playwright
 APP='https://huynguyenkhac17.github.io/gmaps-media-viewer/'
 HERE=os.path.dirname(os.path.abspath(__file__))
 HTML=open(os.path.join(HERE,'..','index.html'),encoding='utf-8').read()
 PNG=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
 X='x'*30
+def png(w,h):   # plain grey PNG of any size (the 1x1 above cannot show a photo too tall for the lightbox)
+    c=lambda t,d: struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+    return b'\x89PNG\r\n\x1a\n'+c(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))+c(b'IDAT',zlib.compress(b''.join(b'\x00'+b'\x80'*3*w for _ in range(h))))+c(b'IEND',b'')
+TALL=png(900,1600)
 async def lh3(route):
     u=route.request.url
     if u.endswith('=dv'):
         if 'VID' in u: await route.fulfill(status=302, headers={'Location':'https://drum.usercontent.google.com/x.mp4'})
         elif 'HANG' in u: await asyncio.sleep(20); await route.abort()
         else: await route.fulfill(status=500, body='err')
-    else: await route.fulfill(status=200, body=PNG, content_type='image/png', headers={'Access-Control-Allow-Origin':'*'})
+    else: await route.fulfill(status=200, body=TALL if 'TALL' in u else PNG, content_type='image/png', headers={'Access-Control-Allow-Origin':'*'})
 SEND='''async (d) => { const raw = typeof d === 'string' ? d : JSON.stringify(d);
   const st = new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   const u = new Uint8Array(await new Response(st).arrayBuffer()); let b=''; u.forEach(c=>b+=String.fromCharCode(c));
@@ -98,6 +102,15 @@ async def main():
         await pg.set_viewport_size({'width':w,'height':800}); await pg.wait_for_timeout(200)
         m=await pg.evaluate("({h: document.querySelector('header').getBoundingClientRect().height, over: document.documentElement.scrollWidth > innerWidth + 1})")
         check('layout at %dpx: header one line, no sideways scroll'%w, m['h']<=54 and not m['over'], m)
+    # lightbox: a photo taller than the screen must shrink to fit (16:9 laptop at 125% = 1536x730), caption or not
+    await pg.set_viewport_size({'width':1536,'height':730})
+    tall={'bv':ver,'n':'Q','dg':'','r':[{'a':'An','s':5,'t':'Ngon '*200,'p':['gps-cs-s/TALLR'+X],'m':0}],'x':['gps-cs-s/TALL'+X],'v':[]}
+    await pg.evaluate(SEND, tall); await pg.wait_for_timeout(1200)
+    for sel in ('.rv .thumb', '.rv:nth-child(2) .thumb'):
+        await pg.click(sel); await pg.wait_for_timeout(600)
+        fit=await pg.evaluate("(()=>{const i=document.querySelector('#lbbody img').getBoundingClientRect(),b=document.querySelector('#lbbody').getBoundingClientRect();return {img:[i.top,i.bottom,i.height],box:[b.top,b.bottom],fits:i.height>100&&i.top>=b.top-1&&i.bottom<=b.bottom+1&&i.right<=innerWidth}})()")
+        await pg.keyboard.press('Escape')
+        check('lightbox fits a tall photo at 1536x730: '+sel, fit['fits'], fit)
     check('no page errors', not errs, errs)
     print('ALL PASS' if ok else 'SOME FAILED')
     await b.close()
