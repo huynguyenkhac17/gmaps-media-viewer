@@ -41,7 +41,8 @@ details{grid-column:1/-1;color:var(--muted);font-size:13px}
 details ol{margin:6px 0 0;padding-left:20px}
 code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;align-items:start}
-@media (max-width:900px){.cols{grid-template-columns:1fr}.input{grid-template-columns:1fr}.actions{flex-direction:row;flex-wrap:wrap}.colhead{position:static}h1{font-size:14px}}
+.cols.three{grid-template-columns:1fr 1fr 1fr}
+@media (max-width:900px){.cols,.cols.three{grid-template-columns:1fr}.input{grid-template-columns:1fr}.actions{flex-direction:row;flex-wrap:wrap}.colhead{position:static}h1{font-size:14px}}
 .col{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);min-height:200px}
 .colhead{position:sticky;top:53px;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .colhead h2{font-size:15px;margin:0}
@@ -117,7 +118,8 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       <summary>Hướng dẫn</summary>
       <ol>
         <li>Kéo nút <b>📍 Lấy ảnh Maps</b> lên thanh dấu trang (chỉ là bookmark, không cần cài gì). Không kéo được thì bấm <b>Copy code bookmark</b>, tạo bookmark mới và dán vào ô URL.</li>
-        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (bình luận kèm ảnh), mở thư viện → tab <b>Tất cả</b> (mọi ảnh, kể cả ảnh không kèm bình luận), rồi tab <b>Video</b> (video và ngày đăng), sau đó mở trang này.</li>
+        <li>Mở địa điểm trên Google Maps rồi bấm bookmark <b>📍 Lấy ảnh Maps</b>. Bookmark tự duyệt tab <b>Bài đánh giá</b> (bình luận kèm ảnh), mở thư viện → tab <b>Tất cả</b> (mọi ảnh, kể cả ảnh không kèm bình luận), tab <b>Thực đơn</b> (nếu địa điểm có), rồi tab <b>Video</b> (video và ngày đăng), sau đó mở trang này.</li>
+        <li>Ảnh trong tab Thực đơn của Maps hiện ở cột <b>Thực đơn</b> riêng (không lặp lại ở cột Ảnh). Địa điểm không có tab này thì chỉ có 2 cột.</li>
         <li>Trên khung nhỏ: <b>Bỏ qua bước</b> kết thúc bước đang chạy và làm tiếp bước sau (dùng khi quá nhiều bình luận); <b>Gửi ngay</b> dừng tất cả và gửi phần đã lấy, các bước chưa chạy sẽ không có dữ liệu.</li>
         <li>Cột Ảnh nhóm theo từng bình luận: bấm nội dung để mở rộng, <b>Chọn ảnh</b> để tick cả nhóm, <b>Copy bình luận</b> để chép nội dung.</li>
         <li>Dùng Chrome hoặc Edge trên máy tính. Nếu trang kết quả không tự mở (trình duyệt chặn cửa sổ bật lên), bấm <b>Mở kết quả</b> trên khung nhỏ.</li>
@@ -149,6 +151,16 @@ label.all{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:poin
       </div>
       <div class="grid" data-grid></div>
       <div class="empty" data-empty>Chưa có video.</div>
+    </section>
+    <section class="col" data-kind="menu" hidden>
+      <div class="colhead">
+        <h2>Thực đơn</h2><span class="count" data-count>0</span>
+        <span class="sp"></span>
+        <label class="all"><input type="checkbox" data-all> Chọn tất cả</label>
+        <button data-copysel disabled>Copy đã chọn</button>
+      </div>
+      <div class="grid" data-grid></div>
+      <div class="empty" data-empty>Chưa có ảnh thực đơn.</div>
     </section>
   </div>
 </main>
@@ -219,7 +231,8 @@ function toDate15(raw, now = new Date()) {
 /* ==== END CORE ==== */
 
 const $ = s => document.querySelector(s);
-const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', r: review index|-1, sel, date, dateRaw, checking}
+const items = new Map();           // path -> {p, kind:'pending'|'photo'|'video', r: review index|-1, m: from the menu tab, sel, date, dateRaw, checking}
+const KINDS = ['photo', 'video', 'menu'], KNAME = { photo: 'ảnh', video: 'video', menu: 'ảnh thực đơn' };
 const STORE = 'gmv.items.v1', RSTORE = 'gmv.reviews.v1';
 let reviews = [];                  // [{a: author, s: stars, t: text, m: hidden extra photos}]
 const cols = {};
@@ -245,17 +258,17 @@ async function copyText(s, label) {
 }
 function save() {
   try {
-    localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw, r, checking }) => [p, kind, date || '', dateRaw || '', r ?? -1, checking ? 1 : 0])));
+    localStorage.setItem(STORE, JSON.stringify([...items.values()].map(({ p, kind, date, dateRaw, r, checking, m }) => [p, kind, date || '', dateRaw || '', r ?? -1, checking ? 1 : 0, m ? 1 : 0])));
     localStorage.setItem(RSTORE, JSON.stringify(reviews));
     localStorage.setItem('gmv.diag', diag);
   } catch {}
 }
 function load() {
   try { reviews = JSON.parse(localStorage.getItem(RSTORE)) || []; diag = localStorage.getItem('gmv.diag') || ''; } catch {}
-  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw, r, c]) => items.set(p, { p, kind, date, dateRaw, r: r ?? -1, checking: !!c, sel: false })); } catch {}
+  try { (JSON.parse(localStorage.getItem(STORE)) || []).forEach(([p, kind, date, dateRaw, r, c, m]) => items.set(p, { p, kind, date, dateRaw, r: r ?? -1, checking: !!c, m: !!m, sel: false })); } catch {}
 }
 const shortId = p => p.slice(-14);
-const kindOf = it => it.kind === 'video' ? 'video' : 'photo';
+const kindOf = it => it.kind === 'video' ? 'video' : it.m ? 'menu' : 'photo';
 
 /* ---------- classify: photo vs video ----------
    Two independent checks, because neither could be tried against every Google response shape:
@@ -338,7 +351,7 @@ function makeCard(it) {
   const img = c.querySelector('img'); img.src = thumbUrl(it.p);
   img.onerror = () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'lbmsg', textContent: 'Không tải được', style: 'color:var(--muted);font-size:12px' })); };
   c.querySelector('.ck').onchange = e => { it.sel = e.target.checked; updateCard(it); syncHead(); };
-  c.querySelector('.cp').onclick = () => copyText(urlOf(it), 'Đã copy URL ' + (it.kind === 'video' ? 'video' : 'ảnh'));
+  c.querySelector('.cp').onclick = () => copyText(urlOf(it), 'Đã copy URL ' + KNAME[kindOf(it)]);
   c.querySelector('.del').onclick = () => { items.delete(it.p); save(); render(); };
   c.querySelector('.thumb').onclick = () => openLB(it);
   it.el = c; updateCard(it); return c;
@@ -364,7 +377,7 @@ function reviewHead(rv, arr) {
   return g;
 }
 function render() {
-  for (const kind of ['photo', 'video']) {
+  for (const kind of KINDS) {
     const col = cols[kind], list = listOf(kind), frag = document.createDocumentFragment();
     const grouped = kind === 'photo' && list.some(i => reviews[i.r]);
     col.grid.className = grouped ? 'groups' : 'grid';
@@ -383,10 +396,13 @@ function render() {
     col.empty.hidden = list.length > 0;
     col.count.textContent = list.length;
   }
+  /* The menu column only exists for places whose gallery has a "Thực đơn" tab. */
+  cols.menu.el.hidden = !listOf('menu').length;
+  $('.cols').classList.toggle('three', !cols.menu.el.hidden);
   syncHead(); status();
 }
 function syncHead() {
-  for (const kind of ['photo', 'video']) {
+  for (const kind of KINDS) {
     const col = cols[kind], list = listOf(kind), n = list.filter(i => i.sel).length;
     col.all.checked = list.length > 0 && n === list.length;
     col.all.indeterminate = n > 0 && n < list.length;
@@ -394,12 +410,12 @@ function syncHead() {
     col.copy.textContent = n ? `Copy đã chọn (${n})` : 'Copy đã chọn';
   }
 }
-for (const kind of ['photo', 'video']) {
+for (const kind of KINDS) {
   const col = cols[kind];
   col.all.onchange = () => { listOf(kind).forEach(i => { i.sel = col.all.checked; updateCard(i); }); syncHead(); };
   col.copy.onclick = () => {
     const sel = listOf(kind).filter(i => i.sel);
-    copyText(sel.map(urlOf).join(','), `Đã copy ${sel.length} link ${kind === 'video' ? 'video' : 'ảnh'}`);
+    copyText(sel.map(urlOf).join(','), `Đã copy ${sel.length} link ${KNAME[kind]}`);
   };
 }
 
@@ -425,7 +441,7 @@ function openLB(it) {
   const body = $('#lbbody');
   body.querySelectorAll('img,video,.lbmsg').forEach(n => n.remove());
   const url = urlOf(it), list = listOf(kindOf(it)), i = list.indexOf(it);
-  $('#lbt').textContent = `${it.kind === 'video' ? 'Video' : 'Ảnh'} ${i + 1}/${list.length}${it.date ? ' · ' + it.date : ''} — ${url}`;
+  $('#lbt').textContent = `${{ photo: 'Ảnh', video: 'Video', menu: 'Thực đơn' }[kindOf(it)]} ${i + 1}/${list.length}${it.date ? ' · ' + it.date : ''} — ${url}`;
   $('#lbopen').href = url;
   const rv = reviews[it.r], cap = $('#lbcap');
   cap.hidden = !rv;
@@ -468,16 +484,17 @@ document.addEventListener('keydown', e => {
    grab() runs on the user's own Google Maps tab (their IP + session, so Google doesn't block it):
    1) "Bài đánh giá" tab: each review with its text and photos;
    2) gallery "Tất cả" tab: every photo (also those without a review); tiles labelled "Video" are videos;
-   3) gallery "Video" tab: remaining videos + upload dates;
+   3) gallery "Thực đơn" tab (only when the place has one): the photos Google files as menu;
+   4) gallery "Video" tab: remaining videos + upload dates;
    then it hands everything to this page in the URL hash (#z=…, see "boot").
    Rules: no innerHTML/eval (Maps enforces Trusted Types), only block comments (the code is serialized
    into the bookmark). Bump BM_VER on every change to grab(), so old bookmarks get the "update" banner. */
-const BM_VER = 9;
+const BM_VER = 10;
 function grab(APP, VER) {
   if (window.__gmvRun) return; window.__gmvRun = 1;
   const placeAtStart = ((document.querySelector('[role="main"] h1') || {}).textContent || '').trim();
   const RE = /lh[3-6]\.(?:googleusercontent|ggpht)\.com(?:\/|%2F)([^\s"'<>()\\,!?#&;]+)/gi;
-  const ALL = new Set(), VID = new Set();
+  const ALL = new Set(), VID = new Set(), MENU = new Set();
   /* stop = "Gửi ngay" (send what we have), skip = "Bỏ qua bước" (end the current step only), abort = "Huỷ". */
   let stop = 0, skip = 0, abort = 0, phase = '';
   const dg = [];
@@ -517,7 +534,7 @@ function grab(APP, VER) {
   no.onclick = () => { stop = abort = 1; box.remove(); window.__gmvRun = 0; };
   const begin = (name, text) => { phase = name; skip = 0; msg.textContent = '📍 ' + text; };
   row.append(sk, go, no); box.append(msg, cnt, row); document.body.appendChild(box);
-  const show = () => { const u = new Set(ALL); if (typeof REV !== 'undefined') REV.forEach(v => v.p.forEach(p => u.add(p))); VID.forEach(p => u.delete(p)); cnt.textContent = `Ảnh: ${u.size} · Video: ${VID.size}`; };
+  const show = () => { const u = new Set(ALL); if (typeof REV !== 'undefined') REV.forEach(v => v.p.forEach(p => u.add(p))); VID.forEach(p => u.delete(p)); cnt.textContent = `Ảnh: ${u.size} · Video: ${VID.size}` + (MENU.size ? ` · Thực đơn: ${MENU.size}` : ''); };
   /* --- page helpers --- */
   const main = () => document.querySelector('[role="main"]') || document.body;
   const vis = e => e && e.getClientRects().length > 0;
@@ -557,8 +574,11 @@ function grab(APP, VER) {
   let galSc = null;
   const gal = () => (galSc && galSc.isConnected ? galSc : (galSc = scroller()));
   const isVideoTile = e => /^\s*vid[eé]o/i.test(e.getAttribute('aria-label') || '');
-  const scanTiles = (set, sc, strict) => {
-    const t = [...tiles()];
+  /* fresh (Thực đơn tab): its photos are also in "Tất cả", so no label tells a stale "Tất cả" tile from a menu
+     one. Tiles on screen before the switch are marked (__gmvOld) and skipped; a new tab renders new tiles. */
+  const scanTiles = (set, sc, strict, fresh) => {
+    const t = [...tiles()].filter(e => !fresh || !e.__gmvOld);
+    if (fresh && !t.length) return;   /* never fall back to the whole panel: it still shows the old tab */
     /* Video tiles carry aria-label="Video" (seen on real Maps), so "Tất cả" already tells them apart.
        Video tab (strict): accept ONLY such tiles, so photo tiles still on screen while a slow tab
        switch loads are never taken for videos. Unlabelled tiles count only if no tile has a label. */
@@ -595,17 +615,18 @@ function grab(APP, VER) {
   }
   /* A tile whose thumbnail URL never arrived (scrolled past too fast on a slow network): go back to it. */
   const hasUrl = t => /url\(/.test(t.getAttribute('style') || '') || !!t.querySelector('[style*="url("],img[src]');
-  async function scrollAll(set, strict) {
+  async function scrollAll(set, strict, fresh) {
     /* strict: old photo tiles may still be on screen while the Video tab loads, so count video tiles only */
-    const count = () => { const t = [...tiles()]; return strict && t.some(e => e.hasAttribute('aria-label')) ? t.filter(isVideoTile).length : t.length; };
-    await scrollList(gal, sc => { scanTiles(set, sc, strict); show(); }, () => set.size + VID.size, count, 900000);
-    for (const t of [...tiles()].filter(x => !hasUrl(x)).slice(0, 300)) {
+    const cur = () => [...tiles()].filter(e => !fresh || !e.__gmvOld);
+    const count = () => { const t = cur(); return strict && t.some(e => e.hasAttribute('aria-label')) ? t.filter(isVideoTile).length : t.length; };
+    await scrollList(gal, sc => { scanTiles(set, sc, strict, fresh); show(); }, () => set.size + VID.size, count, 900000);
+    for (const t of cur().filter(x => !hasUrl(x)).slice(0, 300)) {
       if (halt()) break;
       t.scrollIntoView({ block: 'center' });
       await waitFor(() => hasUrl(t), 4000);
     }
-    scanTiles(set, gal(), strict); show();
-    return [...tiles()].filter(x => !hasUrl(x)).length;
+    scanTiles(set, gal(), strict, fresh); show();
+    return cur().filter(x => !hasUrl(x)).length;
   }
   /* Upload date: Maps only shows it for the OPEN item, so click each video tile and take the
      date-like text that appears/changes (diff against before the click). */
@@ -654,7 +675,7 @@ function grab(APP, VER) {
       if (pick) DATES[id] = last = pick;
     }
   }
-  const VRE = /^\s*videos?(\s|\(|·|,|:|\d|$)/i, ARE = /^(tất cả|all)(\s|$)/i;
+  const VRE = /^\s*videos?(\s|\(|·|,|:|\d|$)/i, ARE = /^(tất cả|all)(\s|$)/i, MRE = /^\s*(thực đơn|menus?)(\s|\(|·|,|:|\d|$)/i;
   const galTab = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re));
   const inGallery = () => !!(galTab(VRE) || galTab(ARE));
   const placeTab = re => [...document.querySelectorAll('[role="tab"]')].find(b => hit(b, re));
@@ -794,7 +815,18 @@ function grab(APP, VER) {
       }
     }
     if (abort) return;
-    /* 3) Video tab: any video still missing + upload dates */
+    /* 3) Menu tab: same scroll as "Tất cả". Only gallery tabs (role=tab, visible) are searched, and only
+       while the gallery is open, so the place's own "Thực đơn" tab is never taken for it. */
+    const mtab = !stop && galleryOpen() && galTab(MRE);
+    if (mtab) {
+      begin('Thực đơn', 'Đang cuộn tab Thực đơn…');
+      tiles().forEach(e => { e.__gmvOld = 1; });
+      await switchTab(mtab);
+      const left = await scrollAll(MENU, false, true);
+      dg.push(`Thực đơn: ${MENU.size} ảnh` + (left ? `, ${left} ô chưa nạp` : ''));
+    } else if (!stop && galleryOpen()) dg.push('Thư viện không có tab Thực đơn');
+    if (abort) return;
+    /* 4) Video tab: any video still missing + upload dates */
     const vtab = !stop && galTab(VRE);
     if (vtab) {
       begin('Video', 'Đang quét tab Video…');
@@ -805,12 +837,12 @@ function grab(APP, VER) {
     } else if (!stop && galleryOpen()) dg.push('Thư viện không có tab Video');
     if (abort) return;
     const reviews = [...REV.values()].map(v => ({ a: v.a, s: v.s, t: v.t, p: [...v.p], m: v.more }));
-    if (!reviews.length && !VID.size && !ALL.size) { msg.textContent = 'Không thấy ảnh/video nào. ' + dg.join(' · '); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
+    if (!reviews.length && !VID.size && !ALL.size && !MENU.size) { msg.textContent = 'Không thấy ảnh/video nào. ' + dg.join(' · '); go.remove(); no.textContent = 'Đóng'; no.onclick = () => box.remove(); window.__gmvRun = 0; return; }
     const inRev = new Set(); REV.forEach(v => v.p.forEach(p => inRev.add(p)));
     if (inRev.size && ALL.size) { let n = 0; inRev.forEach(p => { if (ALL.has(p) || VID.has(p)) n++; }); dg.push(`Ảnh bình luận có trong thư viện: ${n}/${inRev.size}`); }
     const h1 = document.querySelector('[role="main"] h1, h1');
     const data = { bv: VER, n: placeAtStart || (h1 ? h1.textContent.trim() : '') || document.title.replace(/\s*[-–]\s*Google Maps\s*$/i, ''), dg: dg.join(' · '),
-      r: reviews, x: [...ALL].filter(p => !inRev.has(p)), v: [...VID].map(p => [p, DATES[p] || '']) };
+      r: reviews, x: [...ALL].filter(p => !inRev.has(p)), v: [...VID].map(p => [p, DATES[p] || '']), m: [...MENU].filter(p => !VID.has(p)) };
     /* Chrome refuses URLs over 2 MB: drop the review text first, then give up with a clear message. */
     let url = APP + '#z=' + await pack(data);
     if (url.length > 1900000) { data.r.forEach(r => { r.t = ''; }); data.dg += ' · Dữ liệu quá lớn: đã bỏ nội dung bình luận'; url = APP + '#z=' + await pack(data); }
@@ -833,7 +865,7 @@ $('#bmcopy').onclick = () => copyText('javascript:' + encodeURIComponent(BM_SRC)
 /* ---------- boot ---------- */
 // Bookmark payload (#z=…): deflate-raw + base64url JSON
 //   {bv: bookmark version, n: place, dg: diagnostics, r: [{a, s, t, p:[ids], m}],
-//    x: [photo ids not in any review], v: [[video id, dateText]]}
+//    x: [photo ids not in any review], v: [[video id, dateText]], m: [ids from the gallery "Thực đơn" tab]}
 // Each payload REPLACES the current list (a new place).
 async function unpack(z) {
   const b = atob(z.replace(/-/g, '+').replace(/_/g, '/'));
@@ -854,6 +886,7 @@ function parsePayload(d) {
     r: arr(d.r).filter(r => r && typeof r === 'object').map(r => ({ a: str(r.a, 200), s: int(r.s, 5), t: str(r.t, 20000), m: int(r.m, 999), p: arr(r.p).filter(ok) })),
     x: arr(d.x).filter(ok),
     v: arr(d.v).filter(e => Array.isArray(e) && ok(e[0])).map(e => [e[0], str(e[1], 80)]),
+    m: arr(d.m).filter(ok),
   };
 }
 const tok = p => p.slice(p.lastIndexOf('/') + 1);   // same media can appear under two lh3 prefixes
@@ -867,10 +900,12 @@ async function ingest(hash) {
     setPlace(d.n); diag = d.dg; $('#warn').hidden = d.bv === BM_VER;
     const vids = new Map(d.v.map(([p, raw]) => [tok(p), [p, raw]]));
     const revOf = new Map(); d.r.forEach((r, i) => r.p.forEach(p => revOf.has(tok(p)) || revOf.set(tok(p), i)));
-    const seen = new Set();
-    const addPhoto = (p, r) => { const k = tok(p); if (vids.has(k) || seen.has(k)) return; seen.add(k); items.set(p, { p, kind: 'photo', r, sel: false }); };
+    const seen = new Set(), menu = new Set(d.m.map(tok));
+    /* A menu photo is also in "Tất cả" (and maybe a review): it goes to the menu column only. */
+    const addPhoto = (p, r) => { const k = tok(p); if (vids.has(k) || seen.has(k)) return; seen.add(k); items.set(p, { p, kind: 'photo', r, m: menu.has(k), sel: false }); };
     d.r.forEach((r, i) => r.p.forEach(p => addPhoto(p, i)));
     d.x.forEach(p => addPhoto(p, -1));
+    d.m.forEach(p => addPhoto(p, -1));
     for (const [k, [p, raw]] of vids) {
       const it = { p, kind: 'video', r: revOf.has(k) ? revOf.get(k) : -1, sel: false, dateRaw: raw, date: toDate15(raw), checking: true };
       items.set(p, it); classify(it);   // safety net: see "classify"

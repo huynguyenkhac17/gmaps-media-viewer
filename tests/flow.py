@@ -1,15 +1,15 @@
 """Full-flow test on a mock that mimics the real Maps structure reported so far.
-env: NET=slow  CLS=none  PREFIX=1  DIRECT=1  PRESS=skip|send  """
+env: NET=slow  CLS=none  PREFIX=1  DIRECT=1  PRESS=skip|send  NOMENU=1 (gallery without a "Thực đơn" tab)"""
 import base64, re, asyncio, json, os, sys
 from playwright.async_api import async_playwright
 E=os.environ.get
-SLOW=E('NET')=='slow'; CLS=E('CLS','all'); PREFIX=bool(E('PREFIX')); DIRECT=bool(E('DIRECT')); PRESS=E('PRESS','')
+SLOW=E('NET')=='slow'; CLS=E('CLS','all'); PREFIX=bool(E('PREFIX')); DIRECT=bool(E('DIRECT')); PRESS=E('PRESS',''); NOMENU=bool(E('NOMENU'))
 APP='https://huynguyenkhac17.github.io/gmaps-media-viewer/'
 HERE=os.path.dirname(os.path.abspath(__file__))
 HTML=open(os.path.join(HERE,'..','index.html'),encoding='utf-8').read()
 PNG=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
 MP4=open(os.path.join(HERE,'tiny.mp4'),'rb').read()
-P=dict(slow=SLOW, cls=CLS, prefix=PREFIX)
+P=dict(slow=SLOW, cls=CLS, prefix=PREFIX, nomenu=NOMENU)
 MAPS=r'''<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script'"><title>Học viện Test - Google Maps</title></head><body style="margin:0">
 <div role="main" id="main" style="width:420px;height:760px;display:flex;flex-direction:column"></div>
 <div id="vdate" style="position:fixed;left:450px;top:10px"></div>
@@ -57,8 +57,8 @@ function gallery(){const g=++gen;setTimeout(()=>{if(g!==gen)return;main.replaceC
      const add=()=>{const n=Math.min(shown+12,arr.length);for(;shown<n;shown++)list.append(tile(arr[shown],shown));};add();
      list.onscroll=()=>{if(list.scrollTop+list.clientHeight>=list.scrollHeight-4&&!busy&&shown<arr.length){busy=1;setTimeout(()=>{if(f===fg)add();busy=0},L(500,5000))}};},delay);};
   const all=[...REVS.flatMap(r=>r.ps).filter(x=>!x.startsWith('VIDREV')),...OWN.slice(0,4),VIDS[0],'SV',VIDS[1],...OWN.slice(4),VIDS[2]];
-  for(const [n,arr] of [['Tất cả',all],['Mới nhất',all.slice(0,5)],['Video',VIDS],['Thực đơn',OWN.slice(0,2)]]){const b=E('button',{role:'tab','aria-selected':n==='Mới nhất'});b.append(E('img',{src:'https://lh3.googleusercontent.com/gps-cs-s/TABICON'+n.length+X+'xx=w60'}),E('span',{},n));
-     b.onclick=()=>{tabs.querySelectorAll('button').forEach(x=>x.setAttribute('aria-selected',x===b));if(n==='Video'&&P.slow){/* old tiles stay on screen while loading */setTimeout(()=>fill(arr,0),7000)}else fill(arr,L(0,2000))};tabs.append(b);}
+  for(const [n,arr] of [['Tất cả',all],['Mới nhất',all.slice(0,5)],['Video',VIDS],['Thực đơn',OWN.slice(0,2)]].filter(([n])=>!(P.nomenu&&n==='Thực đơn'))){const b=E('button',{role:'tab','aria-selected':n==='Mới nhất'});b.append(E('img',{src:'https://lh3.googleusercontent.com/gps-cs-s/TABICON'+n.length+X+'xx=w60'}),E('span',{},n));
+     b.onclick=()=>{tabs.querySelectorAll('button').forEach(x=>x.setAttribute('aria-selected',x===b));if((n==='Video'||n==='Thực đơn')&&P.slow){/* old tiles stay on screen while loading */setTimeout(()=>fill(arr,0),n==='Video'?7000:12000)}else fill(arr,L(0,2000))};tabs.append(b);}
   main.append(tabs,list);fill(all.slice(0,5),0);},L(600,5000));}
 place('Tổng quan');overview();
 </script></body></html>'''.replace('__P__',json.dumps(P))
@@ -72,7 +72,7 @@ async def lh3(route):
     else: await route.fulfill(status=200, body=PNG, content_type='image/png', headers={'Access-Control-Allow-Origin':'*'})
 async def main():
   async with async_playwright() as p:
-    b=await p.chromium.launch(channel='chrome')
+    b=await p.chromium.launch(channel=os.environ.get('CHANNEL','chrome') or None)
     ctx=await b.new_context(viewport={'width':1300,'height':900})
     await ctx.grant_permissions(['clipboard-read','clipboard-write'],origin='https://huynguyenkhac17.github.io')
     await ctx.route(re.compile(r'https://lh\d\.googleusercontent\.com/.*'), lh3)
@@ -101,9 +101,12 @@ async def main():
     await app.wait_for_load_state(); await app.wait_for_timeout(5000)
     print('took %.0fs'%(asyncio.get_event_loop().time()-t0), 'misclick', await maps.evaluate('window.__misclick||0'))
     rv=await app.evaluate("JSON.parse(localStorage.getItem('gmv.reviews.v1'))"); items=await app.evaluate("JSON.parse(localStorage.getItem('gmv.items.v1'))")
-    photos=[i for i in items if i[1]=='photo']; vids=[i for i in items if i[1]=='video']
+    photos=[i for i in items if i[1]=='photo' and not (len(i)>6 and i[6])]; vids=[i for i in items if i[1]=='video']
+    menu=[i[0].split('/')[1][:4] for i in items if len(i)>6 and i[6]]
     exp_rev=sum(1 for i in range(60) if i%3==0); exp_rp=sum((i%4)+1 for i in range(60) if i%3==0)
-    print('reviews %d (exp %d) | photos %d (exp %d review + 8 owner = %d) | videos %s'%(len(rv),exp_rev,len(photos),exp_rp,exp_rp+8,[(v[0].split('/')[1][:6],v[2],v[4],v[5]) for v in vids]))
+    exp_own=8 if NOMENU else 6
+    print('reviews %d (exp %d) | photos %d (exp %d review + %d owner = %d) | videos %s'%(len(rv),exp_rev,len(photos),exp_rp,exp_own,exp_rp+exp_own,[(v[0].split('/')[1][:6],v[2],v[4],v[5]) for v in vids]))
+    print('menu %s (exp %s) | menu column shown: %s (exp %s)'%(sorted(menu),[] if NOMENU else ['OWN0','OWN1'],not await app.eval_on_selector('.col[data-kind=menu]','e=>e.hidden'),not NOMENU))
     print('no-text review ->', [r['t'] for r in rv if r['a']=='Khách 0'], '| rv6 ->', [r['t'][:40] for r in rv if r['a']=='Khách 6'], '| rv3 text ok:', [r['t'].endswith('mọi người!') for r in rv if r['a']=='Khách 3'])
     print('leaks:', [k for k in ('TABICON','HERO','AVATAR','streetview','SV') if k in json.dumps(items)])
     print('place:', await app.text_content('#place'), '| warn hidden:', await app.eval_on_selector('#warn','e=>e.hidden'))

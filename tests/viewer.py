@@ -25,7 +25,7 @@ def check(name, cond, info=''):
     global ok; ok &= bool(cond); print(('PASS ' if cond else 'FAIL ')+name, info if not cond else '')
 async def main():
   async with async_playwright() as p:
-    b=await p.chromium.launch(channel='chrome')
+    b=await p.chromium.launch(channel=os.environ.get('CHANNEL','chrome') or None)
     ctx=await b.new_context(viewport={'width':1300,'height':900})
     await ctx.grant_permissions(['clipboard-read','clipboard-write'],origin='https://huynguyenkhac17.github.io')
     await ctx.route(re.compile(r'https://lh\d\.googleusercontent\.com/.*'), lh3)
@@ -37,6 +37,19 @@ async def main():
     good={'bv':ver,'n':'Quán A','dg':'Bình luận: duyệt 2, có ảnh 1','r':[{'a':'An','s':5,'t':'Ngon','p':['gps-cs-s/P1'+X,'gps-cs-s/P2'+X],'m':0}],'x':['gps-cs-s/P3'+X],'v':[['gps-cs-s/VID1'+X,'Tháng 2 2024']]}
     await pg.evaluate(SEND, good); await pg.wait_for_timeout(1500); st=await pg.evaluate(STATE)
     check('good payload', st['photos']=='3' and st['videos']=='1' and not st['warn'], st)
+    # menu tab: own column, not repeated under photos; hidden again for a place without menu photos
+    MENUQ="({menu: document.querySelector('.col[data-kind=menu] [data-count]').textContent, shown: !document.querySelector('.col[data-kind=menu]').hidden, three: document.querySelector('.cols').classList.contains('three')})"
+    withm=dict(good); withm['x']=['gps-cs-s/P3'+X,'gps-cs-s/M1'+X]; withm['m']=['gps-cs-s/M1'+X,'geougc-cs/P2'+X,'gps-cs-s/M2'+X,'javascript:x//'+X]
+    await pg.evaluate(SEND, withm); await pg.wait_for_timeout(1200); st=await pg.evaluate(STATE); mq=await pg.evaluate(MENUQ)
+    check('menu photos get their own column', st['photos']=='2' and st['videos']=='1' and mq=={'menu':'3','shown':True,'three':True}, (st,mq))
+    await pg.click('.col[data-kind=menu] [data-all]'); await pg.click('.col[data-kind=menu] [data-copysel]'); clip=await pg.evaluate('navigator.clipboard.readText()')
+    check('copy menu photos =s0', clip.count(',')==2 and all(u.endswith('=s0') for u in clip.split(',')) and 'thực đơn' in (await pg.evaluate(STATE))['toast'], clip)
+    await pg.click('.col[data-kind=menu] .thumb'); await pg.wait_for_timeout(200); lbt=await pg.text_content('#lbt'); await pg.keyboard.press('Escape')
+    check('lightbox steps through menu photos', lbt.startswith('Thực đơn 1/3'), lbt)
+    await pg.reload(); await pg.wait_for_timeout(800); mq=await pg.evaluate(MENUQ)
+    check('menu column kept after reload', mq['menu']=='3' and mq['shown'], mq)
+    await pg.evaluate(SEND, good); await pg.wait_for_timeout(1200); st=await pg.evaluate(STATE); mq=await pg.evaluate(MENUQ)
+    check('no menu photos -> two columns', st['photos']=='3' and mq=={'menu':'0','shown':False,'three':False}, (st,mq))
     # malformed payloads must not wipe the current list
     for name,bad in [('not json','{{{'),('array','[1,2]'),('null','null')]:
         await pg.evaluate(SEND, bad); await pg.wait_for_timeout(700); st=await pg.evaluate(STATE)
@@ -79,7 +92,7 @@ async def main():
     await pg.fill('#src','https://www.google.com/maps/place/Over+The+Moon+Coffee/@10.3801512,107.1028381,17z/data=!4m16!1m9!3m8!1s0x317571e55117434b:0x2acc19bbe5fb8778!2sOver+The+Moon+Coffee!8m2!3d10.380172!4d107.1028045!9m1!1b1!16s%2Fg%2F11sryz220t?entry=ttu&g_ep=EgoyMDI2MTExMC4wIKXMDSoASAFQAw%3D%3D'); await pg.click('#add'); await pg.wait_for_timeout(300); st=await pg.evaluate(STATE)
     check('place link alone adds nothing, explains why', st['photos']=='4' and 'bookmark' in st['toast'], st)
     # layout: long status must not break the header; narrow screen
-    long={'bv':ver,'n':'Học viện Hàng không Việt Nam - Cơ sở 2 (Vietnam Aviation Academy)','dg':'Bình luận: duyệt 1200, có ảnh 310 · Tất cả: 2100 ảnh, 14 video · Video: 14 · Ảnh bình luận có trong thư viện: 900/900','r':[{'a':'An','s':4,'t':'Dài '*300,'p':['gps-cs-s/P%d'%i+X for i in range(7)],'m':2}],'x':['gps-cs-s/Q%d'%i+X for i in range(9)],'v':[['gps-cs-s/VID%d'%i+X,'Tháng 2 2024'] for i in range(3)]}
+    long={'bv':ver,'n':'Học viện Hàng không Việt Nam - Cơ sở 2 (Vietnam Aviation Academy)','dg':'Bình luận: duyệt 1200, có ảnh 310 · Tất cả: 2100 ảnh, 14 video · Video: 14 · Ảnh bình luận có trong thư viện: 900/900','r':[{'a':'An','s':4,'t':'Dài '*300,'p':['gps-cs-s/P%d'%i+X for i in range(7)],'m':2}],'x':['gps-cs-s/Q%d'%i+X for i in range(9)],'v':[['gps-cs-s/VID%d'%i+X,'Tháng 2 2024'] for i in range(3)],'m':['gps-cs-s/MN%d'%i+X for i in range(5)]}
     await pg.evaluate(SEND, long); await pg.wait_for_timeout(1500)
     for w in (1300, 820, 390):
         await pg.set_viewport_size({'width':w,'height':800}); await pg.wait_for_timeout(200)

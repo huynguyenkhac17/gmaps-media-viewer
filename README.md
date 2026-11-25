@@ -1,7 +1,8 @@
 # GMaps Media Viewer
 
 Lấy **ảnh gốc** (`=s0`), **video gốc** (`=dv`, mp4) và **bình luận kèm ảnh** của một địa điểm Google Maps.
-Ảnh ở cột trái (nhóm theo bình luận), video ở cột phải (kèm ngày đăng). Click để xem, tick nhiều mục để copy
+Ảnh ở cột trái (nhóm theo bình luận), video ở cột phải (kèm ngày đăng). Địa điểm có tab **Thực đơn** trong thư viện
+ảnh thì thêm cột **Thực đơn** ở cuối; không có thì chỉ 2 cột. Click để xem, tick nhiều mục để copy
 các link cách nhau dấu phẩy.
 
 **Dùng ngay:** https://huynguyenkhac17.github.io/gmaps-media-viewer/
@@ -13,10 +14,12 @@ Yêu cầu: Chrome hoặc Edge trên máy tính. Không cần cài extension hay
 1. Mở trang trên, kéo nút đỏ **📍 Lấy ảnh Maps** lên thanh dấu trang (Ctrl+Shift+B để hiện thanh).
    Không kéo được thì bấm **Copy code bookmark**, tạo bookmark mới và dán vào ô URL.
 2. Mở một địa điểm trên Google Maps (đang ở trang thông tin của địa điểm), rồi bấm bookmark đó.
-3. Chờ khung nhỏ ở góc phải chạy xong 3 bước:
+3. Chờ khung nhỏ ở góc phải chạy xong các bước:
    - **Bài đánh giá**: cuộn hết, mở "Thêm", lấy tên, số sao, nội dung và ảnh của từng bình luận có ảnh
      (bỏ phản hồi của chủ quán);
    - **Thư viện → tab Tất cả**: lấy mọi ảnh, kể cả ảnh không kèm bình luận; ô gắn nhãn "Video" là video;
+   - **Thư viện → tab Thực đơn** (chỉ khi địa điểm có tab này): cuộn hết như tab Tất cả, lấy các ảnh Google xếp
+     vào thực đơn. Các ảnh này chỉ hiện ở cột Thực đơn, không lặp lại ở cột Ảnh;
    - **Thư viện → tab Video**: bổ sung video và mở từng video để đọc ngày đăng.
 4. Trang kết quả tự mở. Nếu trình duyệt chặn cửa sổ bật lên, bấm **Mở kết quả** trên khung nhỏ.
 
@@ -35,12 +38,14 @@ Cũng có thể dán thẳng vào ô nhập: link Maps của một ảnh/video, 
 
 Dòng trạng thái ở góc phải trên cùng ghi lại bookmark đã thấy gì, ví dụ:
 
-`61 mục · Bình luận: duyệt 60, có ảnh 20 · Tất cả: 58 ảnh, 3 video · Video: 3 · Ảnh bình luận có trong thư viện: 51/51`
+`61 mục · Bình luận: duyệt 60, có ảnh 20 · Tất cả: 58 ảnh, 3 video · Thực đơn: 2 ảnh · Video: 3 · Ảnh bình luận có trong thư viện: 51/51`
 
 Bấm vào dòng đó để copy rồi gửi cho người phụ trách. Cách đọc:
 
 - `Đã bấm Gửi ngay/Bỏ qua ở bước …`: thiếu dữ liệu là do dừng sớm.
 - `Tất cả: 0 ảnh` hoặc `Không mở được thư viện ảnh`: Maps không mở/nạp kịp thư viện; chạy lại.
+- `Thư viện không có tab Thực đơn`: Google không xếp ảnh nào của địa điểm vào thực đơn (hoặc nhãn tab khác
+  "Thực đơn"/"Menu" — khi đó gửi dòng trạng thái kèm ảnh chụp hàng tab của thư viện).
 - `N ô chưa nạp`: còn N ô ảnh Maps chưa tải xong thumbnail.
 - `Ảnh bình luận có trong thư viện: 0/N`: ảnh trong bình luận và trong thư viện dùng hai kiểu link khác nhau
   (trang xem đã gộp theo mã ảnh; nếu vẫn thấy ảnh trùng thì báo lại).
@@ -88,6 +93,8 @@ Maps đang hiển thị cho bạn. Việc dùng lại nội dung đó là trách
   một mục sang cột Ảnh khi cả hai đều nói không phải video. Mạng treo thì giữ nguyên nhãn của bookmark.
 - **Kiểm thử** (cần Node, Python, Playwright và Chrome):
 
+  Máy không có Chrome thật (chỉ Chromium của Playwright) thì đặt `CHANNEL=` (rỗng) trước lệnh Python.
+
   ```
   node tests/core.mjs && node tests/dates.mjs
   python3 tests/viewer.py                      # trang xem: dữ liệu giả mạo, cảnh báo bản cũ, bố cục
@@ -95,6 +102,7 @@ Maps đang hiển thị cho bạn. Việc dùng lại nội dung đó là trách
   NET=slow python3 tests/flow.py               # mạng chậm
   CLS=none PREFIX=1 DIRECT=1 python3 tests/flow.py
   PRESS=skip python3 tests/flow.py ; PRESS=send python3 tests/flow.py
+  NOMENU=1 python3 tests/flow.py               # thư viện không có tab Thực đơn: vẫn 2 cột
   ```
 
   Trang Maps giả lập trong `tests/flow.py` dựng theo cấu trúc Maps thật đã quan sát được; nó không thay
